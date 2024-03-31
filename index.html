@@ -1,7 +1,33 @@
-<html>
-    <head>
-    </head>
-    <body>
-        Hello World!
-    </body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centered Text Input</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #343434; /* 배경색상 */
+            color: white; /* 텍스트 색상 */
+            font-family: Arial, sans-serif;
+        }
+        input[type="text"] {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+            background-color: rgba(255, 255, 255, 0.2); /* 입력 필드의 배경색상 */
+            color: white; /* 입력된 텍스트 색상 */
+        }
+    </style>
+</head>
+<body>
+    <input type="text" placeholder="Enter your text here"> <!-- 사용자 입력 필드 -->
+</body>
 </html>
