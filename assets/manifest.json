@@ -1,5 +1,5 @@
 {
- "name": "App",
+ "name": "ttalkkak",
  "icons": [
   {
    "src": "\/android-icon-36x36.png",
@@ -37,5 +37,10 @@
    "type": "image\/png",
    "density": "4.0"
   }
- ]
+ ],
+ "start_url": "index.html",
+ "display": "standalone",
+ "orientation": "landscape",
+ "background_color": "#343434"
+
 }
