@@ -1,17 +1,33 @@
 import { useState } from 'react'
 import './App.css'
 
+
+function changeTabColor(theme) {
+  const tabColor = document.querySelector("meta[name=theme-color]");
+  if (theme === 'dark') {
+    tabColor.setAttribute('content', '#343434');
+  } else if (theme === 'light') {
+    tabColor.setAttribute('content', '#f3f3f3');
+  } else if (theme === 'system') {
+    if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+      tabColor.setAttribute('content', '#f3f3f3');
+    } else {
+      tabColor.setAttribute('content', '#343434');
+    }
+  } else if (theme === 'terminal') {
+    tabColor.setAttribute('content', '#000000');
+  }
+  else if (theme == 'telnet') {
+    tabColor.setAttribute('content', '#00007d');
+  }
+}
+
 function Phrase(props) {
   const spans = [];
   for (let i = 0; i < props.phrase.length; i++) {
     spans.push(<span key={i} className='word'>{props.phrase[i]}</span>);
   }
   return <div id={props.id} className='phrase'>{spans}</div>;
-}
-
-function changeTabColor() {
-  const metaThemeColor = document.querySelector("meta[name=theme-color]");
-  metaThemeColor.setAttribute("content", window.getComputedStyle(document.body).getPropertyValue('background-color'));
 }
 
 const savedFont = localStorage.getItem('Font');
@@ -25,7 +41,12 @@ function App() {
 
   const [isPixel, setIsPixel] = useState(((font === 'GalmuriMono11') || (font === 'NeoDunggeunmo')) ? true : false);
   document.body.className = theme;
-  changeTabColor();
+  changeTabColor(theme);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    changeTabColor(theme);
+  });
+
+
 
   return (
     <>

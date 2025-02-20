@@ -187,6 +187,11 @@ option {
   background-color: #f3f3f3;
 }
 
+#themeSelector option:nth-child(3) {
+  color: #f3f3f3;
+  background-color: #76767a;
+}
+
 #themeSelector option:nth-child(4) {
   color: #00f900;
   background-color: #000000;
@@ -527,6 +532,11 @@ option {
   .system ::-moz-selection {
     background: #76767a;
     color: #f3f3f3;
+  }
+
+  #themeSelector option:nth-child(3) {
+    color: #343434;
+    background-color: #f3f3f3;
   }
 }
 
