@@ -1,6 +1,14 @@
 import { useState } from 'react'
+import './hangul'
 import './App.css'
 
+function parseText(text) {
+  const textArray = [];
+  for (let i = 0; i < text.length; i++) {
+    textArray.push(Hangul.disassemble(text[i]));
+  }
+  return textArray;
+}
 
 function changeTabColor(theme) {
   const tabColor = document.querySelector("meta[name=theme-color]");
@@ -33,11 +41,57 @@ function Phrase(props) {
 const savedFont = localStorage.getItem('Font');
 const savedTheme = localStorage.getItem('Theme');
 
+let currentIndex = 0;
+let nextIndex = 0;
+const indexList = [];
+
+const jsonPath = 'phrase.json';
+
+//initialize currentIndex and nextIndex
+function setInitIndex() {
+  fetch(jsonPath)
+    .then(response => response.json())
+    .then(data => {
+      currentIndex = Math.floor(Math.random() * data.quotes.length);
+      nextIndex = Math.floor(Math.random() * (data.quotes.length - 1));
+      if (nextIndex >= currentIndex) {
+        nextIndex++;
+      }
+      indexList.push(currentIndex);
+      indexList.push(nextIndex);
+    });
+}
+
+function setPhraseIndex() {
+  fetch(jsonPath)
+    .then(response => response.json())
+    .then(data => {
+      currentIndex = nextIndex;
+      nextIndex = Math.floor(Math.random() * (data.quotes.length - 1));
+      if (nextIndex >= currentIndex) {
+        nextIndex++;
+      }
+      indexList.push(nextIndex);
+    });
+}
+
+
+
 function App() {
+  const [text, setText] = useState('');
+
   const [font, setFont] = useState((savedFont !== null) ? savedFont : 'GowunDodum');
   const [theme, setTheme] = useState((savedTheme !== null) ? savedTheme : 'dark');
-  const [currentPhrase, setCurrentPhrase] = useState('다람쥐 헌 쳇바퀴에 타고파');
-  const [nextPhrase, setNextPhrase] = useState('추운 겨울에는 따뜻한 옷을 입어야지');
+  const [currentPhrase, setCurrentPhrase] = useState('');
+  const [nextPhrase, setNextPhrase] = useState('');
+  const [currentPhraseParsed, setCurrentPhraseParsed] = useState([]);
+  let inputParsed = [];
+
+  const [best, setBest] = useState('0');
+  const [cCPM, setCCPM] = useState('0');
+  const [accuracy, setAccuracy] = useState('100');
+
+  const [toNext, setToNext] = useState(true);
 
   const [isPixel, setIsPixel] = useState(((font === 'GalmuriMono11') || (font === 'NeoDunggeunmo')) ? true : false);
   document.body.className = theme;
@@ -46,7 +100,15 @@ function App() {
     changeTabColor(theme);
   });
 
-
+  //initialize Phrase
+  window.onload = () => {
+    setInitIndex();
+    fetch(jsonPath).then(response => response.json()).then(data => {
+      setCurrentPhrase(data.quotes[currentIndex]);
+      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
+      setNextPhrase(data.quotes[nextIndex]);
+    });
+  }
 
   return (
     <>
@@ -65,19 +127,19 @@ function App() {
                 <span>Best</span>
                 <span className="cpm"> CPM</span>
               </div>
-              <div id="best" className="element">0</div>
+              <div id="best" className="element">{best}</div>
             </div>
             <div>
               <div className="element">
                 <span>Current</span>
                 <span className="cpm"> CPM</span>
               </div>
-              <div id="current" className="element">0</div>
+              <div id="current" className="element">{cCPM}</div>
             </div>
             <div>
               <div className="element">Accuracy</div>
               <div className="element">
-                <span id="accuracy">100</span>
+                <span id="accuracy">{accuracy}</span>
                 <span> %</span>
               </div>
             </div>
@@ -117,10 +179,132 @@ function App() {
           </div>
         </div>
 
-        <div id="main-box" className="box">
+        <div id="main-box" className="box"
+          onKeyDown={(e) => {
+            if (e.key === 'PageUp') {
+              if (indexList.length > 2) {
+                setText('');
+                setToNext(true);
+                indexList.pop();
+                nextIndex = indexList[indexList.length - 1];
+                currentIndex = indexList[indexList.length - 2];
+                fetch(jsonPath).then(response => response.json()).then(data => {
+                  setCurrentPhrase(data.quotes[currentIndex]);
+                  setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
+                  setNextPhrase(data.quotes[nextIndex]);
+                });
+                setCCPM('0');
+                setAccuracy('100');
+              }
+            }
+            if (e.key === 'PageDown') {
+              setText('');
+              setToNext(true);
+              setPhraseIndex();
+              fetch(jsonPath).then(response => response.json()).then(data => {
+                setCurrentPhrase(data.quotes[currentIndex]);
+                setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
+                setNextPhrase(data.quotes[nextIndex]);
+              });
+              setCCPM('0');
+              setAccuracy('100');
+            }
+          }} >
           <div id="current-box">
             <Phrase id="currentPhrase" phrase={currentPhrase} />
-            <input type="text" className="textInput" spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} style={{ fontFamily: font }} />
+            <input type="text" className="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} style={{ fontFamily: font }}
+              onInput={(e) => {
+                if (toNext) {
+                  setText(e.target.value);
+                }
+                /*inputParsed = parseText(e.target.value);
+
+                let correct = 0;
+                let total = 0;
+                let isCorrect = [];
+                const currentPhraseSpan = document.getElementById('currentPhrase');
+
+                for (let i = 0; i < inputParsed.length; i++) {
+
+                  if (currentPhraseParsed && currentPhraseParsed[i]) {
+                    isCorrect.push(true);
+                    for (let j = 0; j < inputParsed[i].length && j < currentPhraseParsed[i].length; j++) {
+                      total++;
+                      if (currentPhraseParsed[i] && inputParsed[i][j] === currentPhraseParsed[i][j]) {
+                        correct++;
+                      }
+                      else {
+                        isCorrect[i] = false;
+                      }
+                    }
+                    // 현재 입력 중인 글자 제외
+                    if (i < inputParsed.length - 1) {
+                      // 받침이 추가로 입력되었을 때
+                      if (inputParsed[i].length > currentPhraseParsed[i].length) {
+                        total += inputParsed[i].length - currentPhraseParsed[i].length;
+                        isCorrect[i] = false;
+                      }
+                      // 받침이 빠졌을 때
+                      if (inputParsed[i].length < currentPhraseParsed[i].length) {
+                        total += currentPhraseParsed[i].length - inputParsed[i].length;
+                        isCorrect[i] = false;
+                      }
+                    }
+                  }
+                  else {
+                    if (inputParsed.length > currentPhraseParsed.length) {
+                      total += inputParsed[i].length;
+                    } // overflow
+                  }
+                }
+
+                for (let i = 0; i < currentPhrase.length; i++) {
+                  if (isCorrect[i] === false) {
+                    currentPhraseSpan.children[i].className = 'wrong';
+                  }
+                  else {
+                    currentPhraseSpan.children[i].className = 'word';
+                  }
+                }
+
+                if (total === 0 || inputParsed.length === 0) {
+                  setCCPM('0');
+                  setAccuracy('100');
+                }
+                else {
+                  //setCCPM((correct / 5).toFixed(2));
+                  setAccuracy(Math.floor(((correct / total)) * 100));
+                }*/
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                  if (currentPhraseParsed && inputParsed && inputParsed.length >= currentPhraseParsed.length) {
+                    setToNext(false);
+                  }
+                }
+              }}
+
+              onKeyUp={(e) => {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                  setToNext(true);
+                  console.log(currentPhraseParsed && inputParsed && inputParsed.length >= currentPhraseParsed.length, currentPhraseParsed && inputParsed, inputParsed.length, currentPhraseParsed.length);
+                  if (currentPhraseParsed && inputParsed && inputParsed.length >= currentPhraseParsed.length) {
+                    setText('');
+                    setPhraseIndex();
+                    fetch(jsonPath).then(response => response.json()).then(data => {
+                      setCurrentPhrase(data.quotes[currentIndex]);
+                      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
+                      setNextPhrase(data.quotes[nextIndex]);
+                    });
+                    setBest(cCPM);
+                    setCCPM('0');
+                    setAccuracy('100');
+                  }
+                }
+              }}
+              onPaste={(e) => {
+                e.preventDefault();
+              }} />
           </div>
         </div>
 
