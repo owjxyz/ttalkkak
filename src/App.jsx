@@ -214,27 +214,25 @@ function App() {
             <Phrase id="currentPhrase" phrase={currentPhrase} />
             <input type="text" className="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} style={{ fontFamily: font }}
               onInput={(e) => {
+                console.log(e.target.value, toNext);
                 if (toNext) {
                   setText(e.target.value);
+                  inputParsed = parseText(e.target.value);
                 }
-                /*inputParsed = parseText(e.target.value);
+                else { // Accuracy Error fix
+                  inputParsed = parseText(text);
+                }
 
                 let correct = 0;
                 let total = 0;
-                let isCorrect = [];
-                const currentPhraseSpan = document.getElementById('currentPhrase');
 
                 for (let i = 0; i < inputParsed.length; i++) {
 
                   if (currentPhraseParsed && currentPhraseParsed[i]) {
-                    isCorrect.push(true);
                     for (let j = 0; j < inputParsed[i].length && j < currentPhraseParsed[i].length; j++) {
                       total++;
                       if (currentPhraseParsed[i] && inputParsed[i][j] === currentPhraseParsed[i][j]) {
                         correct++;
-                      }
-                      else {
-                        isCorrect[i] = false;
                       }
                     }
                     // 현재 입력 중인 글자 제외
@@ -242,12 +240,10 @@ function App() {
                       // 받침이 추가로 입력되었을 때
                       if (inputParsed[i].length > currentPhraseParsed[i].length) {
                         total += inputParsed[i].length - currentPhraseParsed[i].length;
-                        isCorrect[i] = false;
                       }
                       // 받침이 빠졌을 때
                       if (inputParsed[i].length < currentPhraseParsed[i].length) {
-                        total += currentPhraseParsed[i].length - inputParsed[i].length;
-                        isCorrect[i] = false;
+                        total += currentPhraseParsed[i].length - inputParsed[i].length
                       }
                     }
                   }
@@ -258,15 +254,6 @@ function App() {
                   }
                 }
 
-                for (let i = 0; i < currentPhrase.length; i++) {
-                  if (isCorrect[i] === false) {
-                    currentPhraseSpan.children[i].className = 'wrong';
-                  }
-                  else {
-                    currentPhraseSpan.children[i].className = 'word';
-                  }
-                }
-
                 if (total === 0 || inputParsed.length === 0) {
                   setCCPM('0');
                   setAccuracy('100');
@@ -274,11 +261,12 @@ function App() {
                 else {
                   //setCCPM((correct / 5).toFixed(2));
                   setAccuracy(Math.floor(((correct / total)) * 100));
-                }*/
+                }
               }}
+
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-                  if (currentPhraseParsed && inputParsed && inputParsed.length >= currentPhraseParsed.length) {
+                  if (currentPhraseParsed && inputParsed && text.toString().length >= currentPhrase.toString().length) {
                     setToNext(false);
                   }
                 }
@@ -287,8 +275,7 @@ function App() {
               onKeyUp={(e) => {
                 if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
                   setToNext(true);
-                  console.log(currentPhraseParsed && inputParsed && inputParsed.length >= currentPhraseParsed.length, currentPhraseParsed && inputParsed, inputParsed.length, currentPhraseParsed.length);
-                  if (currentPhraseParsed && inputParsed && inputParsed.length >= currentPhraseParsed.length) {
+                  if (currentPhraseParsed && inputParsed && text.toString().length >= currentPhrase.toString().length) {
                     setText('');
                     setPhraseIndex();
                     fetch(jsonPath).then(response => response.json()).then(data => {
