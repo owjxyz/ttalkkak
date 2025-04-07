@@ -107,6 +107,7 @@ function App() {
       setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
       setNextPhrase(data.quotes[nextIndex]);
     });
+    setToNext(true);
   }
 
   function toPrevPhrase() {
@@ -152,6 +153,7 @@ function App() {
                 setText('');
                 setCCPM('0');
                 setAccuracy('100');
+                document.getElementById('textInput').focus();
               }}>ttalkkak</a>
             </h1>
             <div id="date">V. Dev</div>
@@ -230,7 +232,7 @@ function App() {
           }} >
           <div id="current-box">
             <Phrase id="currentPhrase" phrase={currentPhrase} />
-            <input type="text" className="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} style={{ fontFamily: font }}
+            <input type="text" id="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} style={{ fontFamily: font }}
               onInput={(e) => {
                 //console.log(e.target.value, toNext);
                 if (toNext) {
@@ -294,16 +296,8 @@ function App() {
                 if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
                   setToNext(true);
                   if (currentPhraseParsed && inputParsed && text.toString().length >= currentPhrase.toString().length) {
-                    setText('');
-                    setPhraseIndex();
-                    fetch(jsonPath).then(response => response.json()).then(data => {
-                      setCurrentPhrase(data.quotes[currentIndex]);
-                      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
-                      setNextPhrase(data.quotes[nextIndex]);
-                    });
+                    toNextPhrase();
                     setBest(cCPM);
-                    setCCPM('0');
-                    setAccuracy('100');
                   }
                 }
               }}
@@ -319,6 +313,7 @@ function App() {
           </div>
         </div>
       </div>
+
       <div id="preloader">
         <span style={{ fontFamily: "GowunDodum" }}>고운돋움</span>
         <span style={{ fontFamily: "GowunBatang" }}>고운바탕</span>

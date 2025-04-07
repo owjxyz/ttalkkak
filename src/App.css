@@ -224,7 +224,7 @@ option {
   color: #ff0000;
 }
 
-.textInput {
+#textInput {
   all: unset;
   border: none;
   border-bottom: 2px solid #f3f3f3;
@@ -245,15 +245,15 @@ option {
   transition: background-color 0.5s, text-color 0.5s;
 }
 
-.textInput::placeholder {
+#textInput::placeholder {
   color: #76767a;
 }
 
-.textInput::selection {
+#textInput::selection {
   background: #616266;
 }
 
-.textInput::-moz-selection {
+#textInput::-moz-selection {
   background: #616266;
 }
 
@@ -344,11 +344,11 @@ option {
 }
 
 .light #logo a {
-  color: #ffd900;
+  color: #996dff;
 }
 
 .light #date {
-  color: #ffd900;
+  color: #996dff;
 }
 
 .light option {
@@ -356,7 +356,7 @@ option {
   background-color: #f3f3f3;
 }
 
-.light .textInput {
+.light #textInput {
   background-color: #f3f3f3;
   color: #343434;
   caret-color: #343434;
@@ -364,12 +364,12 @@ option {
   text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2);
 }
 
-.light .textInput::selection {
+.light #textInput::selection {
   background: #76767a;
   color: #f3f3f3;
 }
 
-.light .textInput::-moz-selection {
+.light #textInput::-moz-selection {
   background: #76767a;
   color: #f3f3f3;
 }
@@ -410,7 +410,7 @@ option {
   background-color: #000000;
 }
 
-.terminal .textInput {
+.terminal #textInput {
   background-color: #000000;
   color: #00f900;
   caret-color: #00f900;
@@ -418,12 +418,12 @@ option {
   text-shadow: none;
 }
 
-.terminal .textInput::selection {
+.terminal #textInput::selection {
   background: #00f900;
   color: #000000;
 }
 
-.terminal .textInput::-moz-selection {
+.terminal #textInput::-moz-selection {
   background: #00f900;
   color: #000000;
 }
@@ -464,7 +464,7 @@ option {
   background-color: #00007d;
 }
 
-.telnet .textInput {
+.telnet #textInput {
   background-color: #00007d;
   color: #ffffff;
   caret-color: #ffffff;
@@ -472,12 +472,12 @@ option {
   text-shadow: none;
 }
 
-.telnet .textInput::selection {
+.telnet #textInput::selection {
   background: #ffffff;
   color: #00007d;
 }
 
-.telnet .textInput::-moz-selection {
+.telnet #textInput::-moz-selection {
   background: #ffffff;
   color: #00007d;
 }
@@ -519,7 +519,7 @@ option {
     background-color: #f3f3f3;
   }
 
-  .system .textInput {
+  .system #textInput {
     background-color: #f3f3f3;
     color: #343434;
     caret-color: #343434;
@@ -527,12 +527,12 @@ option {
     text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2);
   }
 
-  .system .textInput::selection {
+  .system #textInput::selection {
     background: #76767a;
     color: #f3f3f3;
   }
 
-  .system .textInput::-moz-selection {
+  .system #textInput::-moz-selection {
     background: #76767a;
     color: #f3f3f3;
   }
