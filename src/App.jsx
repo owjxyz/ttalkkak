@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import './hangul'
 import './App.css'
+import Hangul from 'hangul-js'
 
 function parseText(text) {
   const textArray = [];
@@ -100,8 +100,7 @@ function App() {
     changeTabColor(theme);
   });
 
-  //initialize Phrase
-  window.onload = () => {
+  function phraseSetting() {
     setInitIndex();
     fetch(jsonPath).then(response => response.json()).then(data => {
       setCurrentPhrase(data.quotes[currentIndex]);
@@ -110,15 +109,52 @@ function App() {
     });
   }
 
+  function toPrevPhrase() {
+    setText('');
+    indexList.pop();
+    nextIndex = indexList[indexList.length - 1];
+    currentIndex = indexList[indexList.length - 2];
+    fetch(jsonPath).then(response => response.json()).then(data => {
+      setCurrentPhrase(data.quotes[currentIndex]);
+      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
+      setNextPhrase(data.quotes[nextIndex]);
+    });
+    setCCPM('0');
+    setAccuracy('100');
+  }
+
+  function toNextPhrase() {
+    setText('');
+    setPhraseIndex();
+    fetch(jsonPath).then(response => response.json()).then(data => {
+      setCurrentPhrase(data.quotes[currentIndex]);
+      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
+      setNextPhrase(data.quotes[nextIndex]);
+    });
+    setCCPM('0');
+    setAccuracy('100');
+  }
+
+  //initialize Phrase
+  window.onload = () => {
+    phraseSetting();
+  }
+
   return (
     <>
       <div id="boxes" style={{ fontFamily: font }} className={isPixel ? 'pixel' : ''}>
         <div id="header-box">
           <div id="info">
             <h1 id="logo">
-              <a href="">ttalkkak</a>
+              <a href="" onClick={(e) => {
+                e.preventDefault();
+                phraseSetting();
+                setText('');
+                setCCPM('0');
+                setAccuracy('100');
+              }}>ttalkkak</a>
             </h1>
-            <div id="date">V. Canary</div>
+            <div id="date">V. Dev</div>
           </div>
 
           <div id="stats" className="box">
@@ -183,38 +219,20 @@ function App() {
           onKeyDown={(e) => {
             if (e.key === 'PageUp') {
               if (indexList.length > 2) {
-                setText('');
+                toPrevPhrase();
                 setToNext(true);
-                indexList.pop();
-                nextIndex = indexList[indexList.length - 1];
-                currentIndex = indexList[indexList.length - 2];
-                fetch(jsonPath).then(response => response.json()).then(data => {
-                  setCurrentPhrase(data.quotes[currentIndex]);
-                  setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
-                  setNextPhrase(data.quotes[nextIndex]);
-                });
-                setCCPM('0');
-                setAccuracy('100');
               }
             }
             if (e.key === 'PageDown') {
-              setText('');
+              toNextPhrase();
               setToNext(true);
-              setPhraseIndex();
-              fetch(jsonPath).then(response => response.json()).then(data => {
-                setCurrentPhrase(data.quotes[currentIndex]);
-                setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
-                setNextPhrase(data.quotes[nextIndex]);
-              });
-              setCCPM('0');
-              setAccuracy('100');
             }
           }} >
           <div id="current-box">
             <Phrase id="currentPhrase" phrase={currentPhrase} />
             <input type="text" className="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} style={{ fontFamily: font }}
               onInput={(e) => {
-                console.log(e.target.value, toNext);
+                //console.log(e.target.value, toNext);
                 if (toNext) {
                   setText(e.target.value);
                   inputParsed = parseText(e.target.value);

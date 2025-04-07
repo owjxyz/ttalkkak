@@ -30,6 +30,10 @@
   height: 84px;
   font-size: 18px;
   align-content: center;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 #header-box .box {
@@ -91,7 +95,8 @@
 }
 
 #logo a {
-  color: #ffd900;
+  color: #996dff;
+  /* #ffd900; canary*/
   text-decoration: none;
   text-align: center;
 }
@@ -101,7 +106,7 @@
   padding: 10px;
   padding-top: 0px;
   font-size: 16px;
-  color: #ffd900;
+  color: #996dff;
   height: 23px;
 }
 
@@ -252,12 +257,20 @@ option {
   background: #616266;
 }
 
-::selection {
+.phrase span::selection {
   background: #616266;
 }
 
-::-moz-selection {
+.phrase span::-moz-selection {
   background: #616266;
+}
+
+::selection {
+  background: transparent;
+}
+
+::-moz-selection {
+  background: transparent;
 }
 
 /* Narrow UI */
@@ -361,12 +374,12 @@ option {
   color: #f3f3f3;
 }
 
-.light ::selection {
+.light .phrase span::selection {
   background: #76767a;
   color: #f3f3f3;
 }
 
-.light ::-moz-selection {
+.light .phrase span::-moz-selection {
   background: #76767a;
   color: #f3f3f3;
 }
@@ -415,12 +428,12 @@ option {
   color: #000000;
 }
 
-.terminal ::selection {
+.terminal .phrase span::selection {
   background: #00f900;
   color: #000000;
 }
 
-.terminal ::-moz-selection {
+.terminal .phrase span::-moz-selection {
   background: #00f900;
   color: #000000;
 }
@@ -469,12 +482,12 @@ option {
   color: #00007d;
 }
 
-.telnet ::selection {
+.telnet .phrase span::selection {
   background: #ffffff;
   color: #00007d;
 }
 
-.telnet ::-moz-selection {
+.telnet .phrase span::-moz-selection {
   background: #ffffff;
   color: #00007d;
 }
@@ -524,12 +537,12 @@ option {
     color: #f3f3f3;
   }
 
-  .system ::selection {
+  .system .phrase span::selection {
     background: #76767a;
     color: #f3f3f3;
   }
 
-  .system ::-moz-selection {
+  .system .phrase span::-moz-selection {
     background: #76767a;
     color: #f3f3f3;
   }
