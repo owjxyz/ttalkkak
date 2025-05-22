@@ -151,6 +151,48 @@ function App() {
     setAccuracy('100');
   }
 
+  function stats() {
+    let correct = 0;
+    let total = 0;
+
+    for (let i = 0; i < inputParsed.length; i++) {
+
+      if (currentPhraseParsed && currentPhraseParsed[i]) {
+        for (let j = 0; j < inputParsed[i].length && j < currentPhraseParsed[i].length; j++) {
+          total++;
+          if (currentPhraseParsed[i] && inputParsed[i][j] === currentPhraseParsed[i][j]) {
+            correct++;
+          }
+        }
+        // 현재 입력 중인 글자 제외
+        if (i < inputParsed.length - 1) {
+          // 받침이 추가로 입력되었을 때
+          if (inputParsed[i].length > currentPhraseParsed[i].length) {
+            total += inputParsed[i].length - currentPhraseParsed[i].length;
+          }
+          // 받침이 빠졌을 때
+          if (inputParsed[i].length < currentPhraseParsed[i].length) {
+            total += currentPhraseParsed[i].length - inputParsed[i].length
+          }
+        }
+      }
+      else {
+        if (inputParsed.length > currentPhraseParsed.length) {
+          total += inputParsed[i].length;
+        } // overflow
+      }
+    }
+
+    if (total === 0 || inputParsed.length === 0) {
+      setCCPM('0');
+      setAccuracy('100');
+    }
+    else {
+      //setCCPM((correct / 5).toFixed(2));
+      setAccuracy(Math.floor(((correct / total)) * 100));
+    }
+  }
+
   useEffect(() => {
     fetch(jsonPath).then(response => response.json()).then(data => {
       setCurrentPhrase(data.quotes[currentIndex]);
@@ -260,46 +302,7 @@ function App() {
                 else { // Accuracy Error fix
                   inputParsed = parseText(text);
                 }
-
-                let correct = 0;
-                let total = 0;
-
-                for (let i = 0; i < inputParsed.length; i++) {
-
-                  if (currentPhraseParsed && currentPhraseParsed[i]) {
-                    for (let j = 0; j < inputParsed[i].length && j < currentPhraseParsed[i].length; j++) {
-                      total++;
-                      if (currentPhraseParsed[i] && inputParsed[i][j] === currentPhraseParsed[i][j]) {
-                        correct++;
-                      }
-                    }
-                    // 현재 입력 중인 글자 제외
-                    if (i < inputParsed.length - 1) {
-                      // 받침이 추가로 입력되었을 때
-                      if (inputParsed[i].length > currentPhraseParsed[i].length) {
-                        total += inputParsed[i].length - currentPhraseParsed[i].length;
-                      }
-                      // 받침이 빠졌을 때
-                      if (inputParsed[i].length < currentPhraseParsed[i].length) {
-                        total += currentPhraseParsed[i].length - inputParsed[i].length
-                      }
-                    }
-                  }
-                  else {
-                    if (inputParsed.length > currentPhraseParsed.length) {
-                      total += inputParsed[i].length;
-                    } // overflow
-                  }
-                }
-
-                if (total === 0 || inputParsed.length === 0) {
-                  setCCPM('0');
-                  setAccuracy('100');
-                }
-                else {
-                  //setCCPM((correct / 5).toFixed(2));
-                  setAccuracy(Math.floor(((correct / total)) * 100));
-                }
+                stats();
               }}
 
               onKeyDown={(e) => {
