@@ -1,9 +1,13 @@
 import { useState } from 'react'
+import { useEffect } from 'react';
 import './App.css'
 import Hangul from 'hangul-js'
 
 function parseText(text) {
   const textArray = [];
+  if (text === undefined) {
+    return;
+  }
   for (let i = 0; i < text.length; i++) {
     textArray.push(Hangul.disassemble(text[i]));
   }
@@ -32,6 +36,10 @@ function changeTabColor(theme) {
 
 function Phrase(props) {
   const spans = [];
+
+  if (props.phrase === undefined) {
+    return <div id={props.id} className='phrase'></div>;
+  }
   for (let i = 0; i < props.phrase.length; i++) {
     spans.push(<span key={i} className='word'>{props.phrase[i]}</span>);
   }
@@ -40,39 +48,46 @@ function Phrase(props) {
 
 const savedFont = localStorage.getItem('Font');
 const savedTheme = localStorage.getItem('Theme');
+const savedBest = localStorage.getItem('Best');
 
 let currentIndex = 0;
 let nextIndex = 0;
 const indexList = [];
 
 const jsonPath = 'phrase.json';
+let dataLength = 0;
+fetch(jsonPath)
+  .then(response => response.json())
+  .then(data => {
+    dataLength = data.quotes.length;
+    currentIndex = Math.floor(Math.random() * data.quotes.length);
+    nextIndex = Math.floor(Math.random() * (data.quotes.length - 1));
+    if (nextIndex >= currentIndex) {
+      nextIndex++;
+    }
+    indexList.push(currentIndex);
+    indexList.push(nextIndex);
+  });
 
 //initialize currentIndex and nextIndex
 function setInitIndex() {
-  fetch(jsonPath)
-    .then(response => response.json())
-    .then(data => {
-      currentIndex = Math.floor(Math.random() * data.quotes.length);
-      nextIndex = Math.floor(Math.random() * (data.quotes.length - 1));
-      if (nextIndex >= currentIndex) {
-        nextIndex++;
-      }
-      indexList.push(currentIndex);
-      indexList.push(nextIndex);
-    });
+  currentIndex = Math.floor(Math.random() * dataLength);
+  nextIndex = Math.floor(Math.random() * (dataLength - 1));
+  if (nextIndex >= currentIndex) {
+    nextIndex++;
+  }
+  indexList.push(currentIndex);
+  indexList.push(nextIndex);
 }
 
 function setPhraseIndex() {
-  fetch(jsonPath)
-    .then(response => response.json())
-    .then(data => {
-      currentIndex = nextIndex;
-      nextIndex = Math.floor(Math.random() * (data.quotes.length - 1));
-      if (nextIndex >= currentIndex) {
-        nextIndex++;
-      }
-      indexList.push(nextIndex);
-    });
+  currentIndex = nextIndex;
+  nextIndex = Math.floor(Math.random() * (dataLength - 1));
+  if (nextIndex >= currentIndex) {
+    nextIndex++;
+  }
+  indexList.push(nextIndex);
+  console.log(currentIndex, nextIndex);
 }
 
 
@@ -87,7 +102,7 @@ function App() {
   const [currentPhraseParsed, setCurrentPhraseParsed] = useState([]);
   let inputParsed = [];
 
-  const [best, setBest] = useState('0');
+  const [best, setBest] = useState((savedBest !== null) ? savedBest : '0');
   const [cCPM, setCCPM] = useState('0');
   const [accuracy, setAccuracy] = useState('100');
 
@@ -100,7 +115,7 @@ function App() {
     changeTabColor(theme);
   });
 
-  function phraseSetting() {
+  function phraseInit() {
     setInitIndex();
     fetch(jsonPath).then(response => response.json()).then(data => {
       setCurrentPhrase(data.quotes[currentIndex]);
@@ -136,10 +151,14 @@ function App() {
     setAccuracy('100');
   }
 
-  //initialize Phrase
-  window.onload = () => {
-    phraseSetting();
-  }
+  useEffect(() => {
+    fetch(jsonPath).then(response => response.json()).then(data => {
+      setCurrentPhrase(data.quotes[currentIndex]);
+      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
+      setNextPhrase(data.quotes[nextIndex]);
+    });
+    setToNext(true);
+  }, []);
 
   return (
     <>
@@ -149,7 +168,7 @@ function App() {
             <h1 id="logo">
               <a href="" onClick={(e) => {
                 e.preventDefault();
-                phraseSetting();
+                phraseInit();
                 setText('');
                 setCCPM('0');
                 setAccuracy('100');
@@ -191,7 +210,6 @@ function App() {
               } else {
                 setIsPixel(false);
               }
-
               setFont(e.target.value);
               localStorage.setItem('Font', e.target.value);
             }} value={font}>
