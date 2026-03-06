@@ -56,12 +56,55 @@ function Phrase(props) {
   const spans = [];
 
   if (props.phrase === undefined) {
-    return <div id={props.id} className='phrase'></div>;
+    return <div ref={props.phraseRef} id={props.id} className='phrase'></div>;
   }
+
+  // Parse both phrase and input text for comparison
+  const phraseParsed = parseText(props.phrase);
+  const inputParsed = props.inputText ? parseText(props.inputText) : [];
+
   for (let i = 0; i < props.phrase.length; i++) {
-    spans.push(<span key={i} className='word'>{props.phrase[i]}</span>);
+    let isWrong = false;
+
+    // Check if this character position has been typed
+    if (inputParsed[i]) {
+      // Compare decomposed characters
+      if (phraseParsed[i] && inputParsed[i]) {
+        // Check if any component of the character is wrong
+        const phraseComponents = phraseParsed[i];
+        const inputComponents = inputParsed[i];
+
+        // If input has fewer or more components, or any component doesn't match, mark as wrong
+        if (i < inputParsed.length - 1) { // For completed characters
+          if (inputComponents.length !== phraseComponents.length) {
+            isWrong = true;
+          } else {
+            for (let j = 0; j < phraseComponents.length; j++) {
+              if (inputComponents[j] !== phraseComponents[j]) {
+                isWrong = true;
+                break;
+              }
+            }
+          }
+        } else { // For the character currently being typed
+          // Check only the components that have been typed so far
+          for (let j = 0; j < Math.min(inputComponents.length, phraseComponents.length); j++) {
+            if (inputComponents[j] !== phraseComponents[j]) {
+              isWrong = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    spans.push(
+      <span key={i} className={isWrong ? 'word wrong' : 'word'}>
+        {props.phrase[i]}
+      </span>
+    );
   }
-  return <div id={props.id} className='phrase'>{spans}</div>;
+  return <div ref={props.phraseRef} id={props.id} className='phrase'>{spans}</div>;
 }
 
 const savedFont = localStorage.getItem('Font');
@@ -137,6 +180,8 @@ function App() {
   const [toNext, setToNext] = useState(true);
 
   const [isPixel, setIsPixel] = useState(((font === 'GalmuriMono11') || (font === 'NeoDunggeunmo')) ? true : false);
+  const textInputRef = useRef(null);
+  const phraseRef = useRef(null);
   document.body.className = theme;
   changeTabColor(theme);
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
@@ -157,6 +202,14 @@ function App() {
     setCCPM('0');
     setAccuracy('100');
     setToNext(true);
+
+    // Set initial textarea height
+    if (textInputRef.current) {
+      textInputRef.current.style.height = '35px';
+    }
+    if (textInputRef.current) {
+      textInputRef.current.style.height = '35px';
+    }
   }
 
   function toPrevPhrase() {
@@ -174,6 +227,9 @@ function App() {
     });
     setCCPM('0');
     setAccuracy('100');
+    if (textInputRef.current) {
+      textInputRef.current.style.height = '35px';
+    }
   }
 
   function toNextPhrase() {
@@ -189,6 +245,9 @@ function App() {
     });
     setCCPM('0');
     setAccuracy('100');
+    if (textInputRef.current) {
+      textInputRef.current.style.height = '35px';
+    }
   }
 
   function getCurrentCPM() {
@@ -438,7 +497,7 @@ function App() {
                       onClick={() => applyThemeSelection(option.value)}
                     >
                       <span className="selector-check" aria-hidden="true">{option.value === theme ? '✓' : ''}</span>
-                      <span>{option.label}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>{option.label}</span>
                     </button>
                   ))}
                 </div>
@@ -461,9 +520,15 @@ function App() {
             }
           }} >
           <div id="current-box">
-            <Phrase id="currentPhrase" phrase={currentPhrase} />
-            <input type="text" id="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} style={{ fontFamily: font }}
+            <Phrase id="currentPhrase" phrase={currentPhrase} inputText={text} phraseRef={phraseRef} />
+            <textarea ref={textInputRef} id="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} rows={1} style={{ fontFamily: font }}
               onInput={(e) => {
+                // Auto-resize textarea
+                if (textInputRef.current) {
+                  textInputRef.current.style.height = '35px';
+                  const newHeight = Math.max(35, textInputRef.current.scrollHeight);
+                  textInputRef.current.style.height = newHeight + 'px';
+                }
                 //console.log(e.target.value, toNext);
                 let parsedInput = [];
                 if (toNext) {
@@ -481,7 +546,13 @@ function App() {
               }}
 
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
+                    setToNext(false);
+                  }
+                }
+                if (e.key === ' ' || e.key === 'Spacebar') {
                   if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
                     setToNext(false);
                   }
@@ -489,7 +560,17 @@ function App() {
               }}
 
               onKeyUp={(e) => {
-                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setToNext(true);
+                  if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
+                    if (latestAccuracyRef.current === 100) {
+                      updateBestScore(getCurrentCPM());
+                    }
+                    toNextPhrase();
+                  }
+                }
+                if (e.key === ' ' || e.key === 'Spacebar') {
                   setToNext(true);
                   if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
                     if (latestAccuracyRef.current === 100) {
