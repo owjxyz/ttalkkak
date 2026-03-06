@@ -409,28 +409,16 @@ function App() {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!fontMenuRef.current) {
-      console.error('fontMenuRef not found');
-      return;
-    }
-
-    const currentScroll = fontMenuRef.current.scrollTop;
-    const newScroll = currentScroll + 100;
-    fontMenuRef.current.scrollTop = newScroll;
+    blockHoverFocusRef.current = true;
+    setFocusedFontIndex(prev => (prev + 1) % fontOptions.length);
   }
 
   function scrollFontMenuUp(e) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!fontMenuRef.current) {
-      console.error('fontMenuRef not found');
-      return;
-    }
-
-    const currentScroll = fontMenuRef.current.scrollTop;
-    const newScroll = currentScroll - 100;
-    fontMenuRef.current.scrollTop = newScroll;
+    blockHoverFocusRef.current = true;
+    setFocusedFontIndex(prev => (prev - 1 + fontOptions.length) % fontOptions.length);
   }
 
   function handleSelectorKeyDown(e) {
