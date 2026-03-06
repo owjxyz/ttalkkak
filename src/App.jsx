@@ -1,7 +1,25 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useEffect } from 'react';
 import './App.css'
 import Hangul from 'hangul-js'
+
+const fontOptions = [
+  { value: 'GowunDodum', label: '고운돋움', previewFamily: 'GowunDodum' },
+  { value: 'GowunBatang', label: '고운바탕', previewFamily: 'GowunBatang' },
+  { value: 'Pretendard', label: '프리텐다드', previewFamily: 'Pretendard' },
+  { value: 'NanumBarunpen', label: '나눔바른펜', previewFamily: 'NanumBarunpen' },
+  { value: 'D2Coding', label: 'D2Coding', previewFamily: 'D2Coding' },
+  { value: 'GalmuriMono11', label: '갈무리', previewFamily: 'GalmuriMono11' },
+  { value: 'NeoDunggeunmo', label: 'Neo둥근모', previewFamily: 'NeoDunggeunmo' },
+];
+
+const themeOptions = [
+  { value: 'dark', label: 'Dark', previewText: '#f3f3f3', previewBg: '#343434', previewShadow: '0.05em 0.05em 0.1em rgba(0, 0, 0, 1)' },
+  { value: 'light', label: 'Light', previewText: '#343434', previewBg: '#f3f3f3', previewShadow: '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2)' },
+  { value: 'system', label: 'System(Auto)', previewText: '#f3f3f3', previewBg: 'linear-gradient(90deg, #343434 0%, #343434 48%, #8f8f8f 50%, #f3f3f3 52%, #f3f3f3 100%)', previewShadow: '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.55)' },
+  { value: 'terminal', label: 'Terminal', previewText: '#00f900', previewBg: '#000000', previewShadow: 'none' },
+  { value: 'telnet', label: 'Telnet', previewText: '#ffffff', previewBg: '#00007d', previewShadow: 'none' },
+];
 
 function parseText(text) {
   const textArray = [];
@@ -94,17 +112,27 @@ function setPhraseIndex() {
 
 function App() {
   const [text, setText] = useState('');
+  const todayDateText = new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const phraseStartTimeRef = useRef(Date.now());
+  const latestCorrectRef = useRef(0);
+  const latestAccuracyRef = useRef(100);
+  const hasTypingStartedRef = useRef(false);
 
   const [font, setFont] = useState((savedFont !== null) ? savedFont : 'GowunDodum');
   const [theme, setTheme] = useState((savedTheme !== null) ? savedTheme : 'dark');
   const [currentPhrase, setCurrentPhrase] = useState('');
   const [nextPhrase, setNextPhrase] = useState('');
   const [currentPhraseParsed, setCurrentPhraseParsed] = useState([]);
-  let inputParsed = [];
 
   const [best, setBest] = useState((savedBest !== null) ? savedBest : '0');
   const [cCPM, setCCPM] = useState('0');
   const [accuracy, setAccuracy] = useState('100');
+  const [bestMenu, setBestMenu] = useState({ visible: false, x: 0, y: 0 });
+  const [openedSelector, setOpenedSelector] = useState('');
 
   const [toNext, setToNext] = useState(true);
 
@@ -121,7 +149,13 @@ function App() {
       setCurrentPhrase(data.quotes[currentIndex]);
       setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
       setNextPhrase(data.quotes[nextIndex]);
+      phraseStartTimeRef.current = Date.now();
+      latestCorrectRef.current = 0;
+      hasTypingStartedRef.current = false;
     });
+    setText('');
+    setCCPM('0');
+    setAccuracy('100');
     setToNext(true);
   }
 
@@ -134,6 +168,9 @@ function App() {
       setCurrentPhrase(data.quotes[currentIndex]);
       setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
       setNextPhrase(data.quotes[nextIndex]);
+      phraseStartTimeRef.current = Date.now();
+      latestCorrectRef.current = 0;
+      hasTypingStartedRef.current = false;
     });
     setCCPM('0');
     setAccuracy('100');
@@ -146,50 +183,117 @@ function App() {
       setCurrentPhrase(data.quotes[currentIndex]);
       setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
       setNextPhrase(data.quotes[nextIndex]);
+      phraseStartTimeRef.current = Date.now();
+      latestCorrectRef.current = 0;
+      hasTypingStartedRef.current = false;
     });
     setCCPM('0');
     setAccuracy('100');
   }
 
-  function stats() {
+  function getCurrentCPM() {
+    if (!hasTypingStartedRef.current) {
+      return 0;
+    }
+    const elapsedSeconds = Math.max((Date.now() - phraseStartTimeRef.current) / 1000, 1);
+    return Math.floor((latestCorrectRef.current * 60) / elapsedSeconds);
+  }
+
+  function updateBestScore(score) {
+    const currentBest = Number(best) || 0;
+    if (score > currentBest) {
+      const bestText = String(score);
+      setBest(bestText);
+      localStorage.setItem('Best', bestText);
+    }
+  }
+
+  function applyFontSelection(nextFont) {
+    if ((nextFont === 'GalmuriMono11') || (nextFont === 'NeoDunggeunmo')) {
+      setIsPixel(true);
+    } else {
+      setIsPixel(false);
+    }
+    setFont(nextFont);
+    localStorage.setItem('Font', nextFont);
+    setOpenedSelector('');
+  }
+
+  function applyThemeSelection(nextTheme) {
+    setTheme(nextTheme);
+    localStorage.setItem('Theme', nextTheme);
+    setOpenedSelector('');
+  }
+
+  function getFontLabel(fontValue) {
+    const matchedFont = fontOptions.find(option => option.value === fontValue);
+    return matchedFont ? matchedFont.label : fontValue;
+  }
+
+  function getThemeLabel(themeValue) {
+    const matchedTheme = themeOptions.find(option => option.value === themeValue);
+    return matchedTheme ? matchedTheme.label : themeValue;
+  }
+
+  function resetBestScore() {
+    setBest('0');
+    localStorage.setItem('Best', '0');
+    setBestMenu(prev => ({ ...prev, visible: false }));
+  }
+
+  function openBestContextMenu(e) {
+    e.preventDefault();
+    const menuWidth = 170;
+    const menuHeight = 44;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
+    setBestMenu({ visible: true, x, y });
+  }
+
+  function stats(parsedInput) {
     let correct = 0;
     let total = 0;
 
-    for (let i = 0; i < inputParsed.length; i++) {
+    for (let i = 0; i < parsedInput.length; i++) {
 
       if (currentPhraseParsed && currentPhraseParsed[i]) {
-        for (let j = 0; j < inputParsed[i].length && j < currentPhraseParsed[i].length; j++) {
+        for (let j = 0; j < parsedInput[i].length && j < currentPhraseParsed[i].length; j++) {
           total++;
-          if (currentPhraseParsed[i] && inputParsed[i][j] === currentPhraseParsed[i][j]) {
+          if (currentPhraseParsed[i] && parsedInput[i][j] === currentPhraseParsed[i][j]) {
             correct++;
           }
         }
         // 현재 입력 중인 글자 제외
-        if (i < inputParsed.length - 1) {
+        if (i < parsedInput.length - 1) {
           // 받침이 추가로 입력되었을 때
-          if (inputParsed[i].length > currentPhraseParsed[i].length) {
-            total += inputParsed[i].length - currentPhraseParsed[i].length;
+          if (parsedInput[i].length > currentPhraseParsed[i].length) {
+            total += parsedInput[i].length - currentPhraseParsed[i].length;
           }
           // 받침이 빠졌을 때
-          if (inputParsed[i].length < currentPhraseParsed[i].length) {
-            total += currentPhraseParsed[i].length - inputParsed[i].length
+          if (parsedInput[i].length < currentPhraseParsed[i].length) {
+            total += currentPhraseParsed[i].length - parsedInput[i].length
           }
         }
       }
       else {
-        if (inputParsed.length > currentPhraseParsed.length) {
-          total += inputParsed[i].length;
+        if (parsedInput.length > currentPhraseParsed.length) {
+          total += parsedInput[i].length;
         } // overflow
       }
     }
 
-    if (total === 0 || inputParsed.length === 0) {
+    if (total === 0 || parsedInput.length === 0) {
+      latestCorrectRef.current = 0;
+      latestAccuracyRef.current = 100;
+      hasTypingStartedRef.current = false;
       setCCPM('0');
       setAccuracy('100');
     }
     else {
-      //setCCPM((correct / 5).toFixed(2));
-      setAccuracy(Math.floor(((correct / total)) * 100));
+      latestCorrectRef.current = correct;
+      const accuracyValue = Math.floor(((correct / total)) * 100);
+      latestAccuracyRef.current = accuracyValue;
+      setAccuracy(accuracyValue);
     }
   }
 
@@ -198,8 +302,48 @@ function App() {
       setCurrentPhrase(data.quotes[currentIndex]);
       setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
       setNextPhrase(data.quotes[nextIndex]);
+      phraseStartTimeRef.current = Date.now();
+      latestCorrectRef.current = 0;
+      hasTypingStartedRef.current = false;
     });
     setToNext(true);
+  }, []);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (latestCorrectRef.current === 0) {
+        setCCPM('0');
+        return;
+      }
+      setCCPM(String(getCurrentCPM()));
+    }, 100);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    const closeBestMenu = () => {
+      setBestMenu(prev => (prev.visible ? { ...prev, visible: false } : prev));
+      setOpenedSelector('');
+    };
+
+    const onEscape = (e) => {
+      if (e.key === 'Escape') {
+        closeBestMenu();
+      }
+    };
+
+    window.addEventListener('click', closeBestMenu);
+    window.addEventListener('keydown', onEscape);
+    window.addEventListener('scroll', closeBestMenu, true);
+
+    return () => {
+      window.removeEventListener('click', closeBestMenu);
+      window.removeEventListener('keydown', onEscape);
+      window.removeEventListener('scroll', closeBestMenu, true);
+    };
   }, []);
 
   return (
@@ -211,13 +355,10 @@ function App() {
               <a href="" onClick={(e) => {
                 e.preventDefault();
                 phraseInit();
-                setText('');
-                setCCPM('0');
-                setAccuracy('100');
                 document.getElementById('textInput').focus();
               }}>ttalkkak</a>
             </h1>
-            <div id="date">V. Dev</div>
+            <div id="date">{todayDateText}</div>
           </div>
 
           <div id="stats" className="box">
@@ -226,7 +367,7 @@ function App() {
                 <span>Best</span>
                 <span className="cpm"> CPM</span>
               </div>
-              <div id="best" className="element">{best}</div>
+              <div id="best" className="element" onContextMenu={openBestContextMenu} title="우클릭으로 초기화 메뉴 열기">{best}</div>
             </div>
             <div>
               <div className="element">
@@ -246,34 +387,63 @@ function App() {
 
           <div id="option" className="box">
             <span id="font" className="element">Font</span>
-            <select id="fontSelector" onChange={(e) => {
-              if ((e.target.value === 'GalmuriMono11') || (e.target.value === 'NeoDunggeunmo')) {
-                setIsPixel(true);
-              } else {
-                setIsPixel(false);
-              }
-              setFont(e.target.value);
-              localStorage.setItem('Font', e.target.value);
-            }} value={font}>
-              <option value="GowunDodum">고운돋움</option>
-              <option value="GowunBatang">고운바탕</option>
-              <option value="Pretendard">프리텐다드</option>
-              <option value="NanumBarunpen">나눔바른펜</option>
-              <option value="D2Coding">D2Coding</option>
-              <option value="GalmuriMono11">갈무리</option>
-              <option value="NeoDunggeunmo">Neo둥근모</option>
-            </select>
+            <div className="selector-wrap" onClick={(e) => e.stopPropagation()}>
+              <button
+                id="fontSelector"
+                className="selector-trigger"
+                type="button"
+                onClick={() => setOpenedSelector(prev => (prev === 'font' ? '' : 'font'))}
+              >
+                {getFontLabel(font)}
+              </button>
+              {openedSelector === 'font' && (
+                <div className="selector-menu font-menu">
+                  {fontOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`selector-item ${option.value === font ? 'selected' : ''}`}
+                      style={{ fontFamily: option.previewFamily }}
+                      onClick={() => applyFontSelection(option.value)}
+                    >
+                      <span className="selector-check" aria-hidden="true">{option.value === font ? '✓' : ''}</span>
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <span id="theme" className="element">Theme</span>
-            <select id="themeSelector" onChange={(e) => {
-              setTheme(e.target.value)
-              localStorage.setItem('Theme', e.target.value);
-            }} value={theme}>
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-              <option value="system">System(Auto)</option>
-              <option value="terminal">Terminal</option>
-              <option value="telnet">Telnet</option>
-            </select>
+            <div className="selector-wrap" onClick={(e) => e.stopPropagation()}>
+              <button
+                id="themeSelector"
+                className="selector-trigger"
+                type="button"
+                onClick={() => setOpenedSelector(prev => (prev === 'theme' ? '' : 'theme'))}
+              >
+                {getThemeLabel(theme)}
+              </button>
+              {openedSelector === 'theme' && (
+                <div className="selector-menu theme-menu">
+                  {themeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`selector-item ${option.value === theme ? 'selected' : ''}`}
+                      style={{
+                        color: option.previewText,
+                        background: option.previewBg,
+                        textShadow: option.previewShadow,
+                      }}
+                      onClick={() => applyThemeSelection(option.value)}
+                    >
+                      <span className="selector-check" aria-hidden="true">{option.value === theme ? '✓' : ''}</span>
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -295,19 +465,24 @@ function App() {
             <input type="text" id="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} style={{ fontFamily: font }}
               onInput={(e) => {
                 //console.log(e.target.value, toNext);
+                let parsedInput = [];
                 if (toNext) {
                   setText(e.target.value);
-                  inputParsed = parseText(e.target.value);
+                  if (!hasTypingStartedRef.current && e.target.value.length > 0) {
+                    phraseStartTimeRef.current = Date.now();
+                    hasTypingStartedRef.current = true;
+                  }
+                  parsedInput = parseText(e.target.value);
                 }
                 else { // Accuracy Error fix
-                  inputParsed = parseText(text);
+                  parsedInput = parseText(text);
                 }
-                stats();
+                stats(parsedInput);
               }}
 
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-                  if (currentPhraseParsed && inputParsed && text.toString().length >= currentPhrase.toString().length) {
+                  if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
                     setToNext(false);
                   }
                 }
@@ -316,9 +491,11 @@ function App() {
               onKeyUp={(e) => {
                 if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
                   setToNext(true);
-                  if (currentPhraseParsed && inputParsed && text.toString().length >= currentPhrase.toString().length) {
+                  if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
+                    if (latestAccuracyRef.current === 100) {
+                      updateBestScore(getCurrentCPM());
+                    }
                     toNextPhrase();
-                    setBest(cCPM);
                   }
                 }
               }}
@@ -333,6 +510,16 @@ function App() {
             <Phrase id="nextPhrase" phrase={nextPhrase} />
           </div>
         </div>
+
+        {bestMenu.visible && (
+          <div
+            id="best-context-menu"
+            style={{ left: `${bestMenu.x}px`, top: `${bestMenu.y}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button type="button" onClick={resetBestScore}>Best CPM 초기화</button>
+          </div>
+        )}
       </div>
 
       <div id="preloader">

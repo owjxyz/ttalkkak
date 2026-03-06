@@ -108,6 +108,35 @@
   font-size: 16px;
   color: #996dff;
   height: 23px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: right;
+}
+
+.dark #logo a {
+  color: #f3f3f3;
+}
+
+.dark #logo {
+  text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 1);
+}
+
+.dark #date {
+  color: #f3f3f3;
+  text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 1);
+}
+
+.system #logo a {
+  color: #f3f3f3;
+}
+
+.system #logo {
+  text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 1);
+}
+
+.system #date {
+  color: #f3f3f3;
+  text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 1);
 }
 
 #stats {
@@ -121,6 +150,35 @@
   text-align: right;
 }
 
+#best {
+  cursor: context-menu;
+}
+
+#best-context-menu {
+  position: fixed;
+  z-index: 999;
+  min-width: 170px;
+  border: 2px solid #f3f3f3;
+  border-radius: 8px;
+  background-color: #343434;
+  box-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 1);
+  overflow: hidden;
+}
+
+#best-context-menu button {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+#best-context-menu button:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
 #option {
   display: grid;
   grid-template-columns: 1fr 2fr;
@@ -131,6 +189,7 @@
   padding: 10px;
   padding-left: 16px;
   padding-right: 16px;
+  overflow: visible;
 }
 
 #option span {
@@ -140,71 +199,81 @@
   text-align: right;
 }
 
-#option select {
-  all: unset;
+#option .selector-wrap {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: right;
+}
+
+.selector-trigger {
+  all: unset;
+  box-sizing: border-box;
+  width: 118px;
+  min-width: 118px;
+  height: 24px;
+  line-height: 24px;
   text-align: right;
   cursor: pointer;
+  padding: 0 8px;
+  position: relative;
 }
 
-option {
-  color: #f3f3f3;
-  background-color: #76767a;
+.selector-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 118px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 2px solid #f3f3f3;
+  border-radius: 8px;
+  background-color: #454545;
+  box-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 1);
+  z-index: 1000;
 }
 
-#fontSelector option:nth-child(1) {
-  font-family: 'GowunDodum';
+.selector-item {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  position: relative;
+  width: 100%;
+  padding: 8px 10px 8px 24px;
+  cursor: pointer;
+  text-align: right;
 }
 
-#fontSelector option:nth-child(2) {
-  font-family: 'GowunBatang';
+.selector-check {
+  position: absolute;
+  left: 8px;
+  width: 12px;
+  text-align: left;
 }
 
-#fontSelector option:nth-child(3) {
-  font-family: 'Pretendard';
+.selector-item:hover {
+  background-color: rgba(255, 255, 255, 0.14);
 }
 
-#fontSelector option:nth-child(4) {
-  font-family: 'NanumBarunpen';
+.selector-item.selected {
+  font-weight: 700;
 }
 
-#fontSelector option:nth-child(5) {
-  font-family: 'D2Coding';
+
+.theme-menu .selector-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-#fontSelector option:nth-child(6) {
-  font-family: 'GalmuriMono11';
+.theme-menu .selector-item span:last-child {
+  flex: 1;
+  text-align: right;
 }
 
-#fontSelector option:nth-child(7) {
-  font-family: 'NeoDunggeunmo';
-}
-
-#themeSelector option:nth-child(1) {
-  color: #f3f3f3;
-  background-color: #76767a;
-}
-
-#themeSelector option:nth-child(2) {
-  color: #343434;
-  background-color: #f3f3f3;
-}
-
-#themeSelector option:nth-child(3) {
-  color: #f3f3f3;
-  background-color: #76767a;
-}
-
-#themeSelector option:nth-child(4) {
-  color: #00f900;
-  background-color: #000000;
-}
-
-#themeSelector option:nth-child(5) {
-  color: #ffffff;
-  background-color: #00007d;
+.theme-menu .selector-item:last-child {
+  border-bottom: none;
 }
 
 .phrase {
@@ -344,16 +413,35 @@ option {
 }
 
 .light #logo a {
-  color: #996dff;
+  color: #343434;
+}
+
+.light #logo {
+  text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2);
 }
 
 .light #date {
-  color: #996dff;
+  color: #343434;
+  text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2);
 }
 
 .light option {
   color: #343434;
   background-color: #f3f3f3;
+}
+
+.light .selector-menu {
+  border-color: #343434;
+  background-color: #f3f3f3;
+  box-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 0.5);
+}
+
+.light .selector-item:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.light .theme-menu .selector-item {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.14);
 }
 
 .light #textInput {
@@ -372,6 +460,16 @@ option {
 .light #textInput::-moz-selection {
   background: #76767a;
   color: #f3f3f3;
+}
+
+.light #best-context-menu {
+  border-color: #343434;
+  background-color: #f3f3f3;
+  box-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 0.5);
+}
+
+.light #best-context-menu button:hover {
+  background-color: rgba(0, 0, 0, 0.08);
 }
 
 .light .phrase span::selection {
@@ -401,13 +499,31 @@ option {
   color: #00f900;
 }
 
+.terminal #logo {
+  text-shadow: 0 0 0.25em rgba(0, 249, 0, 0.75);
+}
+
 .terminal #date {
   color: #00f900;
+  text-shadow: 0 0 0.2em rgba(0, 249, 0, 0.7);
 }
 
 .terminal option {
   color: #00f900;
   background-color: #000000;
+}
+
+.terminal .selector-menu {
+  border-color: #00f900;
+  background-color: #000000;
+}
+
+.terminal .selector-item:hover {
+  background-color: rgba(0, 249, 0, 0.2);
+}
+
+.terminal .theme-menu .selector-item {
+  border-bottom: 1px solid rgba(0, 249, 0, 0.28);
 }
 
 .terminal #textInput {
@@ -426,6 +542,15 @@ option {
 .terminal #textInput::-moz-selection {
   background: #00f900;
   color: #000000;
+}
+
+.terminal #best-context-menu {
+  border-color: #00f900;
+  background-color: #000000;
+}
+
+.terminal #best-context-menu button:hover {
+  background-color: rgba(0, 249, 0, 0.2);
 }
 
 .terminal .phrase span::selection {
@@ -455,13 +580,31 @@ option {
   color: #ffffff;
 }
 
+.telnet #logo {
+  text-shadow: 0 0 0.2em rgba(255, 255, 255, 0.55);
+}
+
 .telnet #date {
   color: #ffffff;
+  text-shadow: 0 0 0.18em rgba(255, 255, 255, 0.5);
 }
 
 .telnet option {
   color: #ffffff;
   background-color: #00007d;
+}
+
+.telnet .selector-menu {
+  border-color: #ffffff;
+  background-color: #00007d;
+}
+
+.telnet .selector-item:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.telnet .theme-menu .selector-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 .telnet #textInput {
@@ -480,6 +623,15 @@ option {
 .telnet #textInput::-moz-selection {
   background: #ffffff;
   color: #00007d;
+}
+
+.telnet #best-context-menu {
+  border-color: #ffffff;
+  background-color: #00007d;
+}
+
+.telnet #best-context-menu button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .telnet .phrase span::selection {
@@ -507,16 +659,35 @@ option {
   }
 
   .system #logo a {
-    color: #ffd900;
+    color: #343434;
+  }
+
+  .system #logo {
+    text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2);
   }
 
   .system #date {
-    color: #ffd900;
+    color: #343434;
+    text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2);
   }
 
   .system option {
     color: #343434;
     background-color: #f3f3f3;
+  }
+
+  .system .selector-menu {
+    border-color: #343434;
+    background-color: #f3f3f3;
+    box-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 0.5);
+  }
+
+  .system .selector-item:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+  }
+
+  .system .theme-menu .selector-item {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.14);
   }
 
   .system #textInput {
@@ -537,6 +708,16 @@ option {
     color: #f3f3f3;
   }
 
+  .system #best-context-menu {
+    border-color: #343434;
+    background-color: #f3f3f3;
+    box-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 0.5);
+  }
+
+  .system #best-context-menu button:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+  }
+
   .system .phrase span::selection {
     background: #76767a;
     color: #f3f3f3;
@@ -547,10 +728,6 @@ option {
     color: #f3f3f3;
   }
 
-  #themeSelector option:nth-child(3) {
-    color: #343434;
-    background-color: #f3f3f3;
-  }
 }
 
 /*Box Style for Pixelfont*/
@@ -564,6 +741,20 @@ option {
 
 .pixel #date {
   font-family: 'Galmuri7';
+}
+
+.pixel .selector-trigger,
+.pixel .selector-item {
+  font-family: 'GalmuriMono11';
+}
+
+.pixel .selector-menu,
+.pixel #best-context-menu {
+  border-radius: 0;
+}
+
+.pixel #best-context-menu button {
+  font-family: 'GalmuriMono11';
 }
 
 #preloader {
