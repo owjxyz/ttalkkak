@@ -10,8 +10,9 @@ export function analyzeTyping(phrase, input, composingIndex = -1) {
     const expected = phrase[i] === undefined ? [] : Hangul.disassemble(phrase[i])
     const nextInitial = phrase[i + 1] === undefined ? undefined : Hangul.disassemble(phrase[i + 1])[0]
     // During IME composition, the next initial consonant may briefly appear as this syllable's final consonant.
-    const borrowedNextInitial = i === composingIndex && expected.length === 2 && actual.length === 3
-      && actual[0] === expected[0] && actual[1] === expected[1] && actual[2] === nextInitial
+    const borrowedNextInitial = i === composingIndex && expected.length >= 2 && Hangul.isVowel(expected.at(-1))
+      && actual.length === expected.length + 1
+      && expected.every((jamo, index) => actual[index] === jamo) && actual.at(-1) === nextInitial
     const count = borrowedNextInitial
       ? expected.length
       : i === composingIndex
