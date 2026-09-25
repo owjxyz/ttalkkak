@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { useEffect } from 'react';
 import './App.css'
-import { analyzeTyping, getActiveIndex, stripAdvanceSpace } from './typing.js'
+import { analyzeTyping, getActiveIndex, getCharacterAccuracy, stripAdvanceSpace } from './typing.js'
 import { loadPhrases, randomOtherIndex } from './phrases.js'
 
 const fontOptions = [
@@ -374,7 +374,7 @@ function App() {
   }
 
   function stats(input, composingIndex = -1) {
-    const { correct, total } = analyzeTyping(currentPhrase, input, composingIndex);
+    const { correct, total, wrongIndices } = analyzeTyping(currentPhrase, input, composingIndex);
     if (total === 0) {
       latestCorrectRef.current = 0;
       latestAccuracyRef.current = 100;
@@ -384,7 +384,7 @@ function App() {
     }
     else {
       latestCorrectRef.current = correct;
-      const accuracyValue = Math.floor(((correct / total)) * 100);
+      const accuracyValue = getCharacterAccuracy(input, wrongIndices);
       latestAccuracyRef.current = accuracyValue;
       setAccuracy(accuracyValue);
     }

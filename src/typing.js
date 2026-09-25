@@ -31,6 +31,10 @@ export function analyzeTyping(phrase, input, composingIndex = -1) {
   return { correct, total, wrongIndices }
 }
 
+export function getCharacterAccuracy(input, wrongIndices) {
+  return input.length === 0 ? 100 : Math.floor(((input.length - wrongIndices.length) / input.length) * 100)
+}
+
 export function getActiveIndex(phraseLength, inputLength, selectionStart) {
   if (phraseLength === 0) return -1
   if (inputLength === 0) return 0

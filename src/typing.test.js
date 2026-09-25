@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { analyzeTyping, getActiveIndex, stripAdvanceSpace } from './typing.js'
+import { analyzeTyping, getActiveIndex, getCharacterAccuracy, stripAdvanceSpace } from './typing.js'
 
 test('finished Korean syllable counts a missing final consonant as an error', () => {
   assert.deepEqual(analyzeTyping('강', '가'), {
@@ -67,12 +67,20 @@ test('space used to advance is excluded from the submitted phrase', () => {
   assert.equal(stripAdvanceSpace('가', '가  '), '가 ')
 })
 
-test('wrong and extra input lower accuracy', () => {
+test('wrong and extra input produce wrong indices', () => {
   assert.deepEqual(analyzeTyping('가', '나가'), {
     correct: 1,
     total: 4,
     wrongIndices: [0, 1],
   })
+})
+
+test('accuracy counts whole typed characters, including extra input', () => {
+  assert.equal(getCharacterAccuracy('가다', analyzeTyping('가나', '가다').wrongIndices), 50)
+  assert.equal(getCharacterAccuracy('가', analyzeTyping('강', '가').wrongIndices), 0)
+  assert.equal(getCharacterAccuracy('가가', analyzeTyping('가', '가가').wrongIndices), 50)
+  assert.equal(getCharacterAccuracy('간', analyzeTyping('가나', '간', 0).wrongIndices), 100)
+  assert.equal(getCharacterAccuracy('', analyzeTyping('가', '').wrongIndices), 100)
 })
 
 test('underline stays on the character at the input caret', () => {
