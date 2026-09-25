@@ -78,6 +78,8 @@ pnpm preview
 pnpm run deploy
 ```
 
+`deploy`는 새로 빌드한 뒤 `dist`를 GitHub Pages에 올립니다.
+
 검사: `pnpm test`, `pnpm lint`, `pnpm build`
 
 ## 📁 프로젝트 구조

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useEffect } from 'react';
 import './App.css'
 import { analyzeTyping, getActiveIndex, stripAdvanceSpace } from './typing.js'
+import { loadPhrases, randomOtherIndex } from './phrases.js'
 
 const fontOptions = [
   { value: 'GowunDodum', label: '고운돋움', previewFamily: 'GowunDodum' },
@@ -41,6 +42,10 @@ function changeTabColor(theme) {
   }
 }
 
+/**
+ * @param {{ id: string, phrase?: string, inputLength?: number, wrongIndices?: number[], activeIndex?: number, phraseRef?: import('react').RefObject<HTMLDivElement> }} props
+ */
+/* eslint-disable react/prop-types -- Phrase's small internal props contract is documented above without a runtime dependency. */
 function Phrase(props) {
   const wrongIndices = props.wrongIndices || [];
   return <div ref={props.phraseRef} id={props.id} className='phrase'>
@@ -57,18 +62,11 @@ function Phrase(props) {
     ))}
   </div>;
 }
+/* eslint-enable react/prop-types */
 
 const savedFont = localStorage.getItem('Font');
 const savedTheme = localStorage.getItem('Theme');
 const savedBest = localStorage.getItem('Best');
-
-function randomOtherIndex(length, currentIndex) {
-  if (length < 2) return 0;
-  const index = Math.floor(Math.random() * (length - 1));
-  return index >= currentIndex ? index + 1 : index;
-}
-
-
 
 function App() {
   const [text, setText] = useState('');
@@ -91,6 +89,8 @@ function App() {
   const [currentPhrase, setCurrentPhrase] = useState('');
   const [nextPhrase, setNextPhrase] = useState('');
   const [loadError, setLoadError] = useState('');
+  const [loadingPhrases, setLoadingPhrases] = useState(true);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isComposing, setIsComposing] = useState(false);
 
@@ -392,25 +392,19 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${import.meta.env.BASE_URL}phrase.json`, { signal: controller.signal })
-      .then(response => {
-        if (!response.ok) throw new Error('문장을 불러오지 못했습니다.');
-        return response.json();
-      })
-      .then(data => {
-        if (!Array.isArray(data.quotes) || data.quotes.length === 0) {
-          throw new Error('연습할 문장이 없습니다.');
-        }
-        phrasesRef.current = data.quotes;
-        const first = Math.floor(Math.random() * data.quotes.length);
-        indexListRef.current = [first, randomOtherIndex(data.quotes.length, first)];
+    loadPhrases(`${import.meta.env.BASE_URL}phrase.json`, controller.signal)
+      .then(phrases => {
+        phrasesRef.current = phrases;
+        const first = Math.floor(Math.random() * phrases.length);
+        indexListRef.current = [first, randomOtherIndex(phrases.length, first)];
         showPhrasePair();
       })
       .catch(error => {
         if (error.name !== 'AbortError') setLoadError(error.message);
-      });
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoadingPhrases(false); });
     return () => controller.abort();
-  }, [showPhrasePair]);
+  }, [showPhrasePair, loadAttempt]);
 
   useEffect(() => {
     document.body.className = theme;
@@ -686,7 +680,8 @@ function App() {
             }
           }} >
           <div id="current-box">
-            {loadError && <p role="alert">{loadError}</p>}
+            {loadingPhrases && <p role="status">문장을 불러오는 중...</p>}
+            {loadError && <p role="alert">{loadError} <button type="button" onClick={() => { setLoadError(''); setLoadingPhrases(true); setLoadAttempt(attempt => attempt + 1); }}>다시 시도</button></p>}
             <Phrase
               id="currentPhrase"
               phrase={currentPhrase}
