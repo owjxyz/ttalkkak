@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useEffect } from 'react';
 import './App.css'
-import Hangul from 'hangul-js'
+import { analyzeTyping, getActiveIndex, stripAdvanceSpace } from './typing.js'
 
 const fontOptions = [
   { value: 'GowunDodum', label: '고운돋움', previewFamily: 'GowunDodum' },
@@ -20,17 +20,6 @@ const themeOptions = [
   { value: 'terminal', label: 'Terminal', previewText: '#00f900', previewBg: '#000000', previewShadow: 'none' },
   { value: 'telnet', label: 'Telnet', previewText: '#ffffff', previewBg: '#00007d', previewShadow: 'none' },
 ];
-
-function parseText(text) {
-  const textArray = [];
-  if (text === undefined) {
-    return;
-  }
-  for (let i = 0; i < text.length; i++) {
-    textArray.push(Hangul.disassemble(text[i]));
-  }
-  return textArray;
-}
 
 function changeTabColor(theme) {
   const tabColor = document.querySelector("meta[name=theme-color]");
@@ -53,102 +42,30 @@ function changeTabColor(theme) {
 }
 
 function Phrase(props) {
-  const spans = [];
-
-  if (props.phrase === undefined) {
-    return <div ref={props.phraseRef} id={props.id} className='phrase'></div>;
-  }
-
-  // Parse both phrase and input text for comparison
-  const phraseParsed = parseText(props.phrase);
-  const inputParsed = props.inputText ? parseText(props.inputText) : [];
-
-  for (let i = 0; i < props.phrase.length; i++) {
-    let isWrong = false;
-
-    // Check if this character position has been typed
-    if (inputParsed[i]) {
-      // Compare decomposed characters
-      if (phraseParsed[i] && inputParsed[i]) {
-        // Check if any component of the character is wrong
-        const phraseComponents = phraseParsed[i];
-        const inputComponents = inputParsed[i];
-
-        // If input has fewer or more components, or any component doesn't match, mark as wrong
-        if (i < inputParsed.length - 1) { // For completed characters
-          if (inputComponents.length !== phraseComponents.length) {
-            isWrong = true;
-          } else {
-            for (let j = 0; j < phraseComponents.length; j++) {
-              if (inputComponents[j] !== phraseComponents[j]) {
-                isWrong = true;
-                break;
-              }
-            }
-          }
-        } else { // For the character currently being typed
-          // Check only the components that have been typed so far
-          for (let j = 0; j < Math.min(inputComponents.length, phraseComponents.length); j++) {
-            if (inputComponents[j] !== phraseComponents[j]) {
-              isWrong = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    spans.push(
-      <span key={i} className={isWrong ? 'word wrong' : 'word'}>
-        {props.phrase[i]}
-      </span>
-    );
-  }
-  return <div ref={props.phraseRef} id={props.id} className='phrase'>{spans}</div>;
+  const wrongIndices = props.wrongIndices || [];
+  return <div ref={props.phraseRef} id={props.id} className='phrase'>
+    {(props.phrase || '').split('').map((character, index) => (
+      <span
+        key={index}
+        className={[
+          'word',
+          index < props.inputLength ? 'typed' : '',
+          wrongIndices.includes(index) ? 'wrong' : '',
+          index === props.activeIndex ? 'active' : '',
+        ].filter(Boolean).join(' ')}
+      >{character}</span>
+    ))}
+  </div>;
 }
 
 const savedFont = localStorage.getItem('Font');
 const savedTheme = localStorage.getItem('Theme');
 const savedBest = localStorage.getItem('Best');
 
-let currentIndex = 0;
-let nextIndex = 0;
-const indexList = [];
-
-const jsonPath = 'phrase.json';
-let dataLength = 0;
-fetch(jsonPath)
-  .then(response => response.json())
-  .then(data => {
-    dataLength = data.quotes.length;
-    currentIndex = Math.floor(Math.random() * data.quotes.length);
-    nextIndex = Math.floor(Math.random() * (data.quotes.length - 1));
-    if (nextIndex >= currentIndex) {
-      nextIndex++;
-    }
-    indexList.push(currentIndex);
-    indexList.push(nextIndex);
-  });
-
-//initialize currentIndex and nextIndex
-function setInitIndex() {
-  currentIndex = Math.floor(Math.random() * dataLength);
-  nextIndex = Math.floor(Math.random() * (dataLength - 1));
-  if (nextIndex >= currentIndex) {
-    nextIndex++;
-  }
-  indexList.push(currentIndex);
-  indexList.push(nextIndex);
-}
-
-function setPhraseIndex() {
-  currentIndex = nextIndex;
-  nextIndex = Math.floor(Math.random() * (dataLength - 1));
-  if (nextIndex >= currentIndex) {
-    nextIndex++;
-  }
-  indexList.push(nextIndex);
-  console.log(currentIndex, nextIndex);
+function randomOtherIndex(length, currentIndex) {
+  if (length < 2) return 0;
+  const index = Math.floor(Math.random() * (length - 1));
+  return index >= currentIndex ? index + 1 : index;
 }
 
 
@@ -164,20 +81,24 @@ function App() {
   const latestCorrectRef = useRef(0);
   const latestAccuracyRef = useRef(100);
   const hasTypingStartedRef = useRef(false);
+  const phrasesRef = useRef([]);
+  const indexListRef = useRef([]);
+  const composingRef = useRef(false);
+  const pendingSpaceRef = useRef(null);
 
   const [font, setFont] = useState((savedFont !== null) ? savedFont : 'GowunDodum');
   const [theme, setTheme] = useState((savedTheme !== null) ? savedTheme : 'dark');
   const [currentPhrase, setCurrentPhrase] = useState('');
   const [nextPhrase, setNextPhrase] = useState('');
-  const [currentPhraseParsed, setCurrentPhraseParsed] = useState([]);
+  const [loadError, setLoadError] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isComposing, setIsComposing] = useState(false);
 
   const [best, setBest] = useState((savedBest !== null) ? savedBest : '0');
   const [cCPM, setCCPM] = useState('0');
   const [accuracy, setAccuracy] = useState('100');
   const [bestMenu, setBestMenu] = useState({ visible: false, x: 0, y: 0 });
   const [openedSelector, setOpenedSelector] = useState('');
-
-  const [toNext, setToNext] = useState(true);
 
   const [isPixel, setIsPixel] = useState(((font === 'GalmuriMono11') || (font === 'NeoDunggeunmo')) ? true : false);
   const [showFontScrollTopIndicator, setShowFontScrollTopIndicator] = useState(false);
@@ -189,80 +110,64 @@ function App() {
   const fontMenuRef = useRef(null);
   const themeMenuRef = useRef(null);
   const blockHoverFocusRef = useRef(false);
-  document.body.className = theme;
-  changeTabColor(theme);
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    changeTabColor(theme);
-  });
-
-  function phraseInit() {
-    setInitIndex();
-    fetch(jsonPath).then(response => response.json()).then(data => {
-      setCurrentPhrase(data.quotes[currentIndex]);
-      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
-      setNextPhrase(data.quotes[nextIndex]);
-      phraseStartTimeRef.current = Date.now();
-      latestCorrectRef.current = 0;
-      hasTypingStartedRef.current = false;
-    });
+  const showPhrasePair = useCallback(() => {
+    const indices = indexListRef.current;
+    const phrases = phrasesRef.current;
+    setCurrentPhrase(phrases[indices[indices.length - 2]]);
+    setNextPhrase(phrases[indices[indices.length - 1]]);
+    phraseStartTimeRef.current = Date.now();
+    latestCorrectRef.current = 0;
+    latestAccuracyRef.current = 100;
+    hasTypingStartedRef.current = false;
+    composingRef.current = false;
+    pendingSpaceRef.current = null;
+    setIsComposing(false);
+    setActiveIndex(0);
     setText('');
     setCCPM('0');
     setAccuracy('100');
-    setToNext(true);
+    if (textInputRef.current) {
+      textInputRef.current.style.height = '35px';
+    }
+  }, []);
 
-    // Set initial textarea height
-    if (textInputRef.current) {
-      textInputRef.current.style.height = '35px';
-    }
-    if (textInputRef.current) {
-      textInputRef.current.style.height = '35px';
-    }
+  function phraseInit() {
+    const count = phrasesRef.current.length;
+    if (!count) return;
+    const first = Math.floor(Math.random() * count);
+    indexListRef.current = [first, randomOtherIndex(count, first)];
+    showPhrasePair();
   }
 
   function toPrevPhrase() {
-    setText('');
-    indexList.pop();
-    nextIndex = indexList[indexList.length - 1];
-    currentIndex = indexList[indexList.length - 2];
-    fetch(jsonPath).then(response => response.json()).then(data => {
-      setCurrentPhrase(data.quotes[currentIndex]);
-      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
-      setNextPhrase(data.quotes[nextIndex]);
-      phraseStartTimeRef.current = Date.now();
-      latestCorrectRef.current = 0;
-      hasTypingStartedRef.current = false;
-    });
-    setCCPM('0');
-    setAccuracy('100');
-    if (textInputRef.current) {
-      textInputRef.current.style.height = '35px';
-    }
+    if (indexListRef.current.length <= 2) return;
+    indexListRef.current.pop();
+    showPhrasePair();
   }
 
   function toNextPhrase() {
-    setText('');
-    setPhraseIndex();
-    fetch(jsonPath).then(response => response.json()).then(data => {
-      setCurrentPhrase(data.quotes[currentIndex]);
-      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
-      setNextPhrase(data.quotes[nextIndex]);
-      phraseStartTimeRef.current = Date.now();
-      latestCorrectRef.current = 0;
-      hasTypingStartedRef.current = false;
-    });
-    setCCPM('0');
-    setAccuracy('100');
-    if (textInputRef.current) {
-      textInputRef.current.style.height = '35px';
-    }
+    const indices = indexListRef.current;
+    if (indices.length < 2) return;
+    const current = indices[indices.length - 1];
+    indices.push(randomOtherIndex(phrasesRef.current.length, current));
+    showPhrasePair();
   }
 
-  function getCurrentCPM() {
+  function advancePhrase(input) {
+    if (input.length < currentPhrase.length) return;
+    const { correct, total } = analyzeTyping(currentPhrase, input);
+    if (input.length === currentPhrase.length && total > 0 && correct === total) {
+      updateBestScore(getCurrentCPM(correct));
+    }
+    toNextPhrase();
+  }
+
+  function getCurrentCPM(correct = latestCorrectRef.current) {
     if (!hasTypingStartedRef.current) {
       return 0;
     }
     const elapsedSeconds = Math.max((Date.now() - phraseStartTimeRef.current) / 1000, 1);
-    return Math.floor((latestCorrectRef.current * 60) / elapsedSeconds);
+    return Math.floor((correct * 60) / elapsedSeconds);
   }
 
   function updateBestScore(score) {
@@ -274,7 +179,7 @@ function App() {
     }
   }
 
-  function applyFontSelection(nextFont) {
+  const applyFontSelection = useCallback((nextFont) => {
     if ((nextFont === 'GalmuriMono11') || (nextFont === 'NeoDunggeunmo')) {
       setIsPixel(true);
     } else {
@@ -283,13 +188,13 @@ function App() {
     setFont(nextFont);
     localStorage.setItem('Font', nextFont);
     setOpenedSelector('');
-  }
+  }, []);
 
-  function applyThemeSelection(nextTheme) {
+  const applyThemeSelection = useCallback((nextTheme) => {
     setTheme(nextTheme);
     localStorage.setItem('Theme', nextTheme);
     setOpenedSelector('');
-  }
+  }, []);
 
   function getFontLabel(fontValue) {
     const matchedFont = fontOptions.find(option => option.value === fontValue);
@@ -309,10 +214,12 @@ function App() {
 
   function openBestContextMenu(e) {
     e.preventDefault();
+    e.stopPropagation();
     const menuWidth = 170;
     const menuHeight = 44;
-    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
-    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
+    const bounds = e.currentTarget.getBoundingClientRect();
+    const x = Math.min(e.detail === 0 ? bounds.left : e.clientX, window.innerWidth - menuWidth - 8);
+    const y = Math.min(e.detail === 0 ? bounds.bottom : e.clientY, window.innerHeight - menuHeight - 8);
     setBestMenu({ visible: true, x, y });
   }
 
@@ -421,33 +328,43 @@ function App() {
     setFocusedFontIndex(prev => (prev - 1 + fontOptions.length) % fontOptions.length);
   }
 
-  function handleSelectorKeyDown(e) {
+  const handleSelectorKeyDown = useCallback((e) => {
     if (openedSelector === 'font') {
+      if (e.target !== document.getElementById('fontSelector') && !fontMenuRef.current?.contains(e.target)) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         blockHoverFocusRef.current = true;
-        setFocusedFontIndex(prev => (prev + 1) % fontOptions.length);
+        const next = (focusedFontIndex + 1) % fontOptions.length;
+        setFocusedFontIndex(next);
+        fontMenuRef.current?.querySelectorAll('.selector-item')[next]?.focus();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         blockHoverFocusRef.current = true;
-        setFocusedFontIndex(prev => (prev - 1 + fontOptions.length) % fontOptions.length);
-      } else if (e.key === 'Enter' && focusedFontIndex >= 0) {
+        const next = (focusedFontIndex - 1 + fontOptions.length) % fontOptions.length;
+        setFocusedFontIndex(next);
+        fontMenuRef.current?.querySelectorAll('.selector-item')[next]?.focus();
+      } else if (e.key === 'Enter' && e.target.id === 'fontSelector' && focusedFontIndex >= 0) {
         e.preventDefault();
         applyFontSelection(fontOptions[focusedFontIndex].value);
       }
     } else if (openedSelector === 'theme') {
+      if (e.target !== document.getElementById('themeSelector') && !themeMenuRef.current?.contains(e.target)) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setFocusedThemeIndex(prev => (prev + 1) % themeOptions.length);
+        const next = (focusedThemeIndex + 1) % themeOptions.length;
+        setFocusedThemeIndex(next);
+        themeMenuRef.current?.querySelectorAll('.selector-item')[next]?.focus();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setFocusedThemeIndex(prev => (prev - 1 + themeOptions.length) % themeOptions.length);
-      } else if (e.key === 'Enter' && focusedThemeIndex >= 0) {
+        const next = (focusedThemeIndex - 1 + themeOptions.length) % themeOptions.length;
+        setFocusedThemeIndex(next);
+        themeMenuRef.current?.querySelectorAll('.selector-item')[next]?.focus();
+      } else if (e.key === 'Enter' && e.target.id === 'themeSelector' && focusedThemeIndex >= 0) {
         e.preventDefault();
         applyThemeSelection(themeOptions[focusedThemeIndex].value);
       }
     }
-  }
+  }, [openedSelector, focusedFontIndex, focusedThemeIndex, applyFontSelection, applyThemeSelection]);
 
   function handleFontItemMouseEnter(index) {
     if (blockHoverFocusRef.current) {
@@ -456,39 +373,9 @@ function App() {
     setFocusedFontIndex(index);
   }
 
-  function stats(parsedInput) {
-    let correct = 0;
-    let total = 0;
-
-    for (let i = 0; i < parsedInput.length; i++) {
-
-      if (currentPhraseParsed && currentPhraseParsed[i]) {
-        for (let j = 0; j < parsedInput[i].length && j < currentPhraseParsed[i].length; j++) {
-          total++;
-          if (currentPhraseParsed[i] && parsedInput[i][j] === currentPhraseParsed[i][j]) {
-            correct++;
-          }
-        }
-        // 현재 입력 중인 글자 제외
-        if (i < parsedInput.length - 1) {
-          // 받침이 추가로 입력되었을 때
-          if (parsedInput[i].length > currentPhraseParsed[i].length) {
-            total += parsedInput[i].length - currentPhraseParsed[i].length;
-          }
-          // 받침이 빠졌을 때
-          if (parsedInput[i].length < currentPhraseParsed[i].length) {
-            total += currentPhraseParsed[i].length - parsedInput[i].length
-          }
-        }
-      }
-      else {
-        if (parsedInput.length > currentPhraseParsed.length) {
-          total += parsedInput[i].length;
-        } // overflow
-      }
-    }
-
-    if (total === 0 || parsedInput.length === 0) {
+  function stats(input, composingIndex = -1) {
+    const { correct, total } = analyzeTyping(currentPhrase, input, composingIndex);
+    if (total === 0) {
       latestCorrectRef.current = 0;
       latestAccuracyRef.current = 100;
       hasTypingStartedRef.current = false;
@@ -504,16 +391,40 @@ function App() {
   }
 
   useEffect(() => {
-    fetch(jsonPath).then(response => response.json()).then(data => {
-      setCurrentPhrase(data.quotes[currentIndex]);
-      setCurrentPhraseParsed(parseText(data.quotes[currentIndex]));
-      setNextPhrase(data.quotes[nextIndex]);
-      phraseStartTimeRef.current = Date.now();
-      latestCorrectRef.current = 0;
-      hasTypingStartedRef.current = false;
-    });
-    setToNext(true);
-  }, []);
+    const controller = new AbortController();
+    fetch(`${import.meta.env.BASE_URL}phrase.json`, { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error('문장을 불러오지 못했습니다.');
+        return response.json();
+      })
+      .then(data => {
+        if (!Array.isArray(data.quotes) || data.quotes.length === 0) {
+          throw new Error('연습할 문장이 없습니다.');
+        }
+        phrasesRef.current = data.quotes;
+        const first = Math.floor(Math.random() * data.quotes.length);
+        indexListRef.current = [first, randomOtherIndex(data.quotes.length, first)];
+        showPhrasePair();
+      })
+      .catch(error => {
+        if (error.name !== 'AbortError') setLoadError(error.message);
+      });
+    return () => controller.abort();
+  }, [showPhrasePair]);
+
+  useEffect(() => {
+    document.body.className = theme;
+    changeTabColor(theme);
+    if (theme !== 'system') return;
+    const media = window.matchMedia('(prefers-color-scheme: light)');
+    const onChange = () => changeTabColor('system');
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, [theme]);
+
+  useEffect(() => {
+    if (currentPhrase) textInputRef.current?.focus();
+  }, [currentPhrase]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -564,7 +475,7 @@ function App() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('scroll', onScroll, true);
     };
-  }, [openedSelector, focusedFontIndex, focusedThemeIndex]);
+  }, [openedSelector, handleSelectorKeyDown]);
 
   useEffect(() => {
     if (openedSelector === 'font' && fontMenuRef.current) {
@@ -640,7 +551,7 @@ function App() {
                 <span>Best</span>
                 <span className="cpm"> CPM</span>
               </div>
-              <div id="best" className="element" onContextMenu={openBestContextMenu} title="우클릭으로 초기화 메뉴 열기">{best}</div>
+              <button id="best" className="element" type="button" onClick={openBestContextMenu} onContextMenu={openBestContextMenu} aria-label={`최고 기록 ${best} CPM, 초기화 메뉴 열기`} aria-expanded={bestMenu.visible} aria-controls="best-context-menu">{best}</button>
             </div>
             <div>
               <div className="element">
@@ -665,6 +576,9 @@ function App() {
                 id="fontSelector"
                 className="selector-trigger"
                 type="button"
+                aria-expanded={openedSelector === 'font'}
+                aria-controls="fontMenu"
+                aria-label={`글꼴 선택, 현재 ${getFontLabel(font)}`}
                 onClick={() => setOpenedSelector(prev => (prev === 'font' ? '' : 'font'))}
               >
                 {getFontLabel(font)}
@@ -672,6 +586,7 @@ function App() {
               {openedSelector === 'font' && (
                 <div
                   ref={fontMenuRef}
+                  id="fontMenu"
                   className="selector-menu font-menu"
                   onClick={(e) => e.stopPropagation()}
                   onScroll={handleFontMenuScroll}
@@ -690,8 +605,10 @@ function App() {
                       key={option.value}
                       type="button"
                       className={`selector-item ${option.value === font ? 'selected' : ''} ${index === focusedFontIndex ? 'focused' : ''}`}
+                      aria-pressed={option.value === font}
                       style={{ fontFamily: option.previewFamily }}
                       onClick={() => applyFontSelection(option.value)}
+                      onFocus={() => setFocusedFontIndex(index)}
                       onMouseEnter={() => handleFontItemMouseEnter(index)}
                     >
                       <span className="selector-check" aria-hidden="true">{option.value === font ? '✓' : ''}</span>
@@ -715,6 +632,9 @@ function App() {
                 id="themeSelector"
                 className="selector-trigger"
                 type="button"
+                aria-expanded={openedSelector === 'theme'}
+                aria-controls="themeMenu"
+                aria-label={`테마 선택, 현재 ${getThemeLabel(theme)}`}
                 onClick={() => setOpenedSelector(prev => (prev === 'theme' ? '' : 'theme'))}
               >
                 {getThemeLabel(theme)}
@@ -722,6 +642,7 @@ function App() {
               {openedSelector === 'theme' && (
                 <div
                   ref={themeMenuRef}
+                  id="themeMenu"
                   className="selector-menu theme-menu"
                   onClick={(e) => e.stopPropagation()}
                   onWheel={handleThemeMenuWheel}
@@ -731,6 +652,7 @@ function App() {
                       key={option.value}
                       type="button"
                       className={`selector-item ${option.value === theme ? 'selected' : ''} ${index === focusedThemeIndex ? 'focused' : ''}`}
+                      aria-pressed={option.value === theme}
                       data-theme={option.value}
                       style={{
                         color: option.previewText,
@@ -738,6 +660,7 @@ function App() {
                         textShadow: option.previewShadow,
                       }}
                       onClick={() => applyThemeSelection(option.value)}
+                      onFocus={() => setFocusedThemeIndex(index)}
                       onMouseEnter={() => setFocusedThemeIndex(index)}
                     >
                       <span className="selector-check" aria-hidden="true">{option.value === theme ? '✓' : ''}</span>
@@ -752,81 +675,96 @@ function App() {
 
         <div id="main-box" className="box"
           onKeyDown={(e) => {
+            if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) return;
             if (e.key === 'PageUp') {
-              if (indexList.length > 2) {
+              if (indexListRef.current.length > 2) {
                 toPrevPhrase();
-                setToNext(true);
               }
             }
             if (e.key === 'PageDown') {
               toNextPhrase();
-              setToNext(true);
             }
           }} >
           <div id="current-box">
-            <Phrase id="currentPhrase" phrase={currentPhrase} inputText={text} phraseRef={phraseRef} />
-            <textarea ref={textInputRef} id="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} rows={1} style={{ fontFamily: font }}
+            {loadError && <p role="alert">{loadError}</p>}
+            <Phrase
+              id="currentPhrase"
+              phrase={currentPhrase}
+              inputLength={text.length}
+              wrongIndices={analyzeTyping(currentPhrase, text, isComposing ? activeIndex : -1).wrongIndices}
+              activeIndex={activeIndex}
+              phraseRef={phraseRef}
+            />
+            <textarea ref={textInputRef} id="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} rows={1} style={{ fontFamily: font }} aria-label="위 문장 따라 입력하기" disabled={!currentPhrase || Boolean(loadError)}
               onInput={(e) => {
-                // Auto-resize textarea
+                const input = pendingSpaceRef.current
+                  ? stripAdvanceSpace(currentPhrase, e.target.value)
+                  : e.target.value;
                 if (textInputRef.current) {
                   textInputRef.current.style.height = '35px';
                   const newHeight = Math.max(35, textInputRef.current.scrollHeight);
                   textInputRef.current.style.height = newHeight + 'px';
                 }
-                //console.log(e.target.value, toNext);
-                let parsedInput = [];
-                if (toNext) {
-                  setText(e.target.value);
-                  if (!hasTypingStartedRef.current && e.target.value.length > 0) {
-                    phraseStartTimeRef.current = Date.now();
-                    hasTypingStartedRef.current = true;
-                  }
-                  parsedInput = parseText(e.target.value);
+                setText(input);
+                setActiveIndex(getActiveIndex(currentPhrase.length, input.length, e.target.selectionStart));
+                if (!hasTypingStartedRef.current && input.length > 0) {
+                  phraseStartTimeRef.current = Date.now();
+                  hasTypingStartedRef.current = true;
                 }
-                else { // Accuracy Error fix
-                  parsedInput = parseText(text);
-                }
-                stats(parsedInput);
+                stats(input, composingRef.current || e.nativeEvent.isComposing
+                  ? getActiveIndex(currentPhrase.length, input.length, e.target.selectionStart)
+                  : -1);
               }}
-
+              onSelect={(e) => setActiveIndex(getActiveIndex(currentPhrase.length, text.length, e.target.selectionStart))}
+              onCompositionStart={() => { composingRef.current = true; setIsComposing(true); }}
+              onCompositionEnd={(e) => {
+                composingRef.current = false;
+                setIsComposing(false);
+                const input = pendingSpaceRef.current
+                  ? stripAdvanceSpace(currentPhrase, e.target.value)
+                  : e.target.value;
+                setText(input);
+                stats(input);
+                if (pendingSpaceRef.current?.released) {
+                  pendingSpaceRef.current = null;
+                  advancePhrase(input);
+                }
+              }}
               onKeyDown={(e) => {
+                const isSpace = e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar';
+                const composing = composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229;
+                if (isSpace) {
+                  if (e.currentTarget.value.length >= currentPhrase.length) {
+                    pendingSpaceRef.current ||= { released: false };
+                    if (!composing) e.preventDefault();
+                  } else {
+                    pendingSpaceRef.current = null;
+                  }
+                  return;
+                }
+                if (composing) return;
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
-                    setToNext(false);
-                  }
-                }
-                if (e.key === ' ' || e.key === 'Spacebar') {
-                  if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
-                    setToNext(false);
-                  }
+                  advancePhrase(e.currentTarget.value);
                 }
               }}
-
               onKeyUp={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  setToNext(true);
-                  if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
-                    if (latestAccuracyRef.current === 100) {
-                      updateBestScore(getCurrentCPM());
-                    }
-                    toNextPhrase();
-                  }
+                if ((e.code !== 'Space' && e.key !== ' ' && e.key !== 'Spacebar') || !pendingSpaceRef.current) return;
+                if (composingRef.current || e.nativeEvent.isComposing) {
+                  pendingSpaceRef.current.released = true;
+                  return;
                 }
-                if (e.key === ' ' || e.key === 'Spacebar') {
-                  setToNext(true);
-                  if (currentPhraseParsed && text.toString().length >= currentPhrase.toString().length) {
-                    if (latestAccuracyRef.current === 100) {
-                      updateBestScore(getCurrentCPM());
-                    }
-                    toNextPhrase();
-                  }
-                }
+                const input = stripAdvanceSpace(currentPhrase, e.currentTarget.value);
+                pendingSpaceRef.current = null;
+                advancePhrase(input);
               }}
+              onBlur={() => { pendingSpaceRef.current = null; }}
               onPaste={(e) => {
                 e.preventDefault();
               }} />
+            <div className="phrase-progress" role="progressbar" aria-label="문장 진행도" aria-valuemin="0" aria-valuemax="100" aria-valuenow={currentPhrase ? Math.min(100, Math.floor(text.length / currentPhrase.length * 100)) : 0}>
+              <div style={{ width: `${currentPhrase ? Math.min(100, text.length / currentPhrase.length * 100) : 0}%` }} />
+            </div>
           </div>
         </div>
 

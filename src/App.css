@@ -160,7 +160,15 @@
 }
 
 #best {
-  cursor: context-menu;
+  all: unset;
+  display: block;
+  width: 100%;
+  cursor: pointer;
+}
+
+#best:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 
 #best-context-menu {
@@ -362,8 +370,29 @@
   width: auto;
 }
 
+.word {
+  display: inline-block;
+  position: relative;
+  white-space: pre;
+}
+
+#currentPhrase .word:not(.typed):not(.active) {
+  opacity: 0.68;
+}
+
+.word.active::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: -3px;
+  border-bottom: 2px solid currentColor;
+}
+
 .wrong {
   color: #ff0000;
+  background: rgba(255, 75, 75, 0.22);
+  border-radius: 3px;
 }
 
 #textInput {
@@ -393,6 +422,20 @@
   transition: background-color 0.5s, text-color 0.5s;
   display: block;
   width: calc(100% - 20px);
+}
+
+.phrase-progress {
+  height: 4px;
+  margin: 8px 10px 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgba(150, 150, 150, 0.3);
+}
+
+.phrase-progress > div {
+  height: 100%;
+  background: currentColor;
+  transition: width 0.12s ease;
 }
 
 #textInput::placeholder {
@@ -508,6 +551,7 @@
 
 .light .wrong {
   color: #cc0000;
+  background: rgba(204, 0, 0, 0.16);
 }
 
 .light option {
@@ -604,6 +648,7 @@
 
 .terminal .wrong {
   color: #ff0080;
+  background: rgba(255, 0, 128, 0.26);
 }
 
 .terminal option {
@@ -698,6 +743,7 @@
 
 .telnet .wrong {
   color: #ff6666;
+  background: rgba(255, 102, 102, 0.28);
 }
 
 .telnet option {
@@ -793,6 +839,7 @@
 
   .system .wrong {
     color: #cc0000;
+    background: rgba(204, 0, 0, 0.16);
   }
 
   .system option {
