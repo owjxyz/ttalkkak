@@ -48,7 +48,17 @@ test('temporary next consonant after a compound vowel is not an error while comp
   })
   assert.deepEqual(analyzeTyping('퀴나', '퀸').wrongIndices, [0])
   assert.deepEqual(analyzeTyping('퀴다', '퀸', 0).wrongIndices, [0])
-  assert.deepEqual(analyzeTyping('갈가', '갉', 0).wrongIndices, [0])
+})
+
+test('temporary compound final from the next initial is not an error while composing', () => {
+  assert.deepEqual(analyzeTyping('실험', '싫', 0), {
+    correct: 3,
+    total: 3,
+    wrongIndices: [],
+  })
+  assert.deepEqual(analyzeTyping('실험', '싫').wrongIndices, [0])
+  assert.deepEqual(analyzeTyping('실가', '싫', 0).wrongIndices, [0])
+  assert.deepEqual(analyzeTyping('갈가', '갉', 0).wrongIndices, [])
 })
 
 test('space used to advance is excluded from the submitted phrase', () => {
