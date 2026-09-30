@@ -2,7 +2,7 @@
   border: solid 2px;
   border-color: #f3f3f3;
   border-radius: 28px;
-  corner-shape: squircle;
+  corner-shape: superellipse(1.8);
   box-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 1);
   margin: 4px;
   overflow: hidden;
@@ -189,7 +189,7 @@
   min-width: 170px;
   border: 2px solid #f3f3f3;
   border-radius: 24px;
-  corner-shape: squircle;
+  corner-shape: superellipse(1.8);
   background-color: #343434;
   box-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 1);
   overflow: hidden;
@@ -261,13 +261,13 @@
   overscroll-behavior: contain;
   border: 2px solid #f3f3f3;
   border-radius: 24px;
-  corner-shape: squircle;
+  corner-shape: superellipse(1.8);
   background-color: #454545;
   box-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 1);
   z-index: 1000;
 }
 
-@supports not (corner-shape: squircle) {
+@supports not (corner-shape: superellipse(1.8)) {
   .box {
     border-radius: 14px;
   }
