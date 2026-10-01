@@ -1,0 +1,6 @@
+# Crawlers use /robots.txt at the host root, not /ttalkkak/robots.txt.
+# On GitHub project Pages, add the Sitemap line to the host root robots.txt.
+User-agent: *
+Allow: /
+
+Sitemap: https://owjxyz.github.io/ttalkkak/sitemap.xml
