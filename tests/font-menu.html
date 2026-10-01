@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#343434">
+    <title>Font menu regression check</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <pre id="result" style="position:fixed;top:0;left:0;white-space:pre-wrap"></pre>
+    <script type="module">
+      // Run with npm run dev, then open /ttalkkak/tests/font-menu.html.
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import '../src/index.css';
+
+      const savedFont = localStorage.getItem('Font');
+      localStorage.setItem('Font', 'GowunDodum');
+      const { default: App } = await import('../src/App.jsx');
+      createRoot(document.getElementById('root')).render(React.createElement(App));
+      const settle = async () => {
+        for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame);
+      };
+      const assert = (condition, message) => { if (!condition) throw new Error(message); };
+      const near = (actual, expected) => Math.abs(actual - expected) < 1;
+      try {
+        await settle();
+        document.getElementById('fontSelector').click();
+        await settle();
+        const menu = document.getElementById('fontMenu');
+        const columnWidth = menu.parentElement.getBoundingClientRect().width;
+        assert(near(menu.getBoundingClientRect().width, columnWidth), 'Font menu must match its grid column');
+        assert(near(document.getElementById('fontSelector').getBoundingClientRect().width, columnWidth), 'Font trigger must match its grid column');
+        const list = menu.querySelector('.font-menu-list') || menu;
+        const items = menu.querySelectorAll('.selector-item');
+        const up = menu.querySelector('.scroll-indicator-top');
+        const down = menu.querySelector('.scroll-indicator-bottom');
+        const rowHeight = items[0].offsetHeight;
+        const initialTop = list.scrollTop;
+        down.click();
+        await settle();
+        assert(near(list.scrollTop, initialTop + rowHeight), 'Down must scroll exactly one row');
+        assert(items[0].getAttribute('aria-selected') === 'true', 'Scroll must preserve the selected font');
+        down.click();
+        await settle();
+        assert(near(list.scrollTop, initialTop + rowHeight * 2), 'Repeated clicks must each scroll one row');
+        const beforeHover = list.scrollTop;
+        items[5].dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        await settle();
+        assert(near(list.scrollTop, beforeHover), 'Hover must not scroll the list');
+        up.click();
+        await settle();
+        assert(near(list.scrollTop, beforeHover - rowHeight), 'Up must scroll exactly one row');
+        list.scrollTop = 0;
+        list.dispatchEvent(new Event('scroll'));
+        await settle();
+        assert(up.disabled, 'Up must be disabled at the top');
+        list.scrollTop = list.scrollHeight;
+        list.dispatchEvent(new Event('scroll'));
+        await settle();
+        assert(down.disabled, 'Down must be disabled at the bottom');
+        items[0].focus({ preventScroll: true });
+        items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+        await settle();
+        assert(document.activeElement === items[1], 'ArrowDown must focus exactly the next font');
+        items[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+        await settle();
+        assert(document.activeElement === items[6], 'End must focus the last font');
+        items[6].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+        await settle();
+        assert(document.activeElement === items[6], 'ArrowDown must stop at the last font');
+        items[6].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+        await settle();
+        assert(document.activeElement === items[0] && near(list.scrollTop, 0), 'Home must show the first font');
+        items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+        await settle();
+        assert(document.activeElement === items[0], 'ArrowUp must stop at the first font');
+        items[6].click();
+        await settle();
+        assert(!document.getElementById('fontMenu'), 'Selection must close the menu');
+        assert(document.getElementById('boxes').style.fontFamily === 'NeoDunggeunmo', 'Selection must apply the font');
+        assert(document.activeElement.id === 'fontSelector', 'Selection must return focus to the trigger');
+        document.getElementById('fontSelector').click();
+        await settle();
+        assert(document.activeElement.textContent.includes('Neo둥근모'), 'Reopening must focus the selected font');
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await settle();
+        assert(!document.getElementById('fontMenu') && document.activeElement.id === 'fontSelector', 'Escape must close and restore focus');
+        document.getElementById('fontSelector').click();
+        await settle();
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+        await settle();
+        assert(!document.getElementById('fontMenu'), 'Tab must close the menu');
+        document.getElementById('fontSelector').click();
+        await settle();
+        document.getElementById('textInput').click();
+        await settle();
+        assert(!document.getElementById('fontMenu'), 'Outside click must close the menu');
+        document.getElementById('themeSelector').click();
+        await settle();
+        const themeMenu = document.getElementById('themeMenu');
+        const themeWidth = themeMenu.parentElement.getBoundingClientRect().width;
+        assert(near(themeMenu.getBoundingClientRect().width, themeWidth), 'Theme menu must match its grid column');
+        assert(near(document.getElementById('themeSelector').getBoundingClientRect().width, themeWidth), 'Theme trigger must match its grid column');
+        for (const item of themeMenu.querySelectorAll('.selector-item')) {
+          const label = item.lastElementChild.getBoundingClientRect();
+          const check = item.firstElementChild.getBoundingClientRect();
+          assert(label.left >= check.right && label.right <= themeMenu.getBoundingClientRect().right, 'Theme labels must fit without overlapping the check');
+        }
+        document.getElementById('textInput').click();
+        await settle();
+        document.getElementById('result').textContent = 'PASS: font menu scroll, hover, boundaries, keyboard, selection and focus';
+      } catch (error) {
+        document.getElementById('result').textContent = `FAIL: ${error.message}`;
+        console.error(error);
+      } finally {
+        if (savedFont === null) localStorage.removeItem('Font');
+        else localStorage.setItem('Font', savedFont);
+      }
+    </script>
+  </body>
+</html>

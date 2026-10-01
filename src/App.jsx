@@ -103,13 +103,12 @@ function App() {
   const [isPixel, setIsPixel] = useState(((font === 'GalmuriMono11') || (font === 'NeoDunggeunmo')) ? true : false);
   const [showFontScrollTopIndicator, setShowFontScrollTopIndicator] = useState(false);
   const [showFontScrollBottomIndicator, setShowFontScrollBottomIndicator] = useState(false);
-  const [focusedFontIndex, setFocusedFontIndex] = useState(-1);
   const [focusedThemeIndex, setFocusedThemeIndex] = useState(-1);
   const textInputRef = useRef(null);
   const phraseRef = useRef(null);
   const fontMenuRef = useRef(null);
   const themeMenuRef = useRef(null);
-  const blockHoverFocusRef = useRef(false);
+  const fontListRef = useRef(null);
   const showPhrasePair = useCallback(() => {
     const indices = indexListRef.current;
     const phrases = phrasesRef.current;
@@ -188,6 +187,7 @@ function App() {
     setFont(nextFont);
     localStorage.setItem('Font', nextFont);
     setOpenedSelector('');
+    document.getElementById('fontSelector')?.focus();
   }, []);
 
   const applyThemeSelection = useCallback((nextTheme) => {
@@ -223,41 +223,40 @@ function App() {
     setBestMenu({ visible: true, x, y });
   }
 
-  function handleFontMenuScroll(e) {
-    const menu = e.target;
-    updateFontScrollIndicators(menu);
-  }
-
   function updateFontScrollIndicators(menu) {
-    const isAtTop = menu.scrollTop <= 1;
-    const isAtBottom = menu.scrollHeight - menu.scrollTop <= menu.clientHeight + 1;
-    setShowFontScrollTopIndicator(!isAtTop);
-    setShowFontScrollBottomIndicator(!isAtBottom);
+    setShowFontScrollTopIndicator(menu.scrollTop > 1);
+    setShowFontScrollBottomIndicator(menu.scrollHeight - menu.scrollTop > menu.clientHeight + 1);
   }
 
-  function handleFontMenuWheel(e) {
-    if (!fontMenuRef.current) {
-      return;
+  function scrollFontMenu(direction) {
+    const list = fontListRef.current;
+    const row = list?.querySelector('.selector-item');
+    if (row) list.scrollTop += direction * row.offsetHeight;
+  }
+
+  const focusFontItem = useCallback((index) => {
+    const item = fontListRef.current?.querySelectorAll('.selector-item')[index];
+    item?.focus({ preventScroll: true });
+    item?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, []);
+
+  function handleFontMenuKeyDown(e) {
+    const items = [...fontListRef.current.querySelectorAll('.selector-item')];
+    const index = items.indexOf(document.activeElement);
+    let next;
+    if (e.key === 'ArrowDown') next = Math.min(index + 1, items.length - 1);
+    else if (e.key === 'ArrowUp') next = Math.max(index - 1, 0);
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = items.length - 1;
+    else if (e.key === 'Tab') {
+      setOpenedSelector('');
+      document.getElementById('fontSelector')?.focus();
     }
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Ignore horizontal gestures and allow vertical-only scrolling.
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-      return;
+    if (next !== undefined) {
+      e.preventDefault();
+      e.stopPropagation();
+      focusFontItem(next);
     }
-
-    const verticalDelta = e.deltaY;
-    if (verticalDelta === 0) {
-      return;
-    }
-
-    const menu = fontMenuRef.current;
-    menu.scrollLeft = 0;
-    const maxScroll = Math.max(0, menu.scrollHeight - menu.clientHeight);
-    const nextScroll = Math.min(maxScroll, Math.max(0, menu.scrollTop + verticalDelta));
-    menu.scrollTop = nextScroll;
   }
 
   function handleThemeMenuWheel(e) {
@@ -266,88 +265,12 @@ function App() {
     e.stopPropagation();
   }
 
-  function scrollFocusedSelectorItemIntoView(menuRef, focusedIndex, options = {}) {
-    if (!menuRef?.current || focusedIndex < 0) {
-      return;
-    }
-
-    const menu = menuRef.current;
-    const items = menu.querySelectorAll('.selector-item');
-    const targetItem = items[focusedIndex];
-    if (!targetItem) {
-      return;
-    }
-
-    if (options.accountForIndicators) {
-      const topIndicator = menu.querySelector('.scroll-indicator-top');
-      const bottomIndicator = menu.querySelector('.scroll-indicator-bottom');
-      const topInset = topIndicator && !topIndicator.classList.contains('hidden') ? topIndicator.offsetHeight : 0;
-      const bottomInset = bottomIndicator && !bottomIndicator.classList.contains('hidden') ? bottomIndicator.offsetHeight : 0;
-
-      // If focus wraps back to first item, pin to top so top indicator disappears.
-      if (focusedIndex === 0) {
-        menu.scrollTop = 0;
-        options.onAdjustedScroll?.(menu);
-        return;
-      }
-
-      const itemTop = targetItem.offsetTop;
-      const itemBottom = itemTop + targetItem.offsetHeight;
-      const viewportTop = menu.scrollTop + topInset;
-      const viewportBottom = menu.scrollTop + menu.clientHeight - bottomInset;
-
-      let nextScrollTop = menu.scrollTop;
-      if (itemTop < viewportTop) {
-        nextScrollTop = itemTop - topInset;
-      } else if (itemBottom > viewportBottom) {
-        nextScrollTop = itemBottom - menu.clientHeight + bottomInset;
-      }
-
-      const maxScrollTop = Math.max(0, menu.scrollHeight - menu.clientHeight);
-      menu.scrollTop = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
-      options.onAdjustedScroll?.(menu);
-      return;
-    }
-
-    targetItem.scrollIntoView({ block: 'nearest' });
-  }
-
-  function scrollFontMenuDown(e) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    blockHoverFocusRef.current = true;
-    setFocusedFontIndex(prev => (prev + 1) % fontOptions.length);
-  }
-
-  function scrollFontMenuUp(e) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    blockHoverFocusRef.current = true;
-    setFocusedFontIndex(prev => (prev - 1 + fontOptions.length) % fontOptions.length);
+  function scrollFocusedSelectorItemIntoView(menuRef, focusedIndex) {
+    menuRef.current?.querySelectorAll('.selector-item')[focusedIndex]?.scrollIntoView({ block: 'nearest' });
   }
 
   const handleSelectorKeyDown = useCallback((e) => {
-    if (openedSelector === 'font') {
-      if (e.target !== document.getElementById('fontSelector') && !fontMenuRef.current?.contains(e.target)) return;
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        blockHoverFocusRef.current = true;
-        const next = (focusedFontIndex + 1) % fontOptions.length;
-        setFocusedFontIndex(next);
-        fontMenuRef.current?.querySelectorAll('.selector-item')[next]?.focus();
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        blockHoverFocusRef.current = true;
-        const next = (focusedFontIndex - 1 + fontOptions.length) % fontOptions.length;
-        setFocusedFontIndex(next);
-        fontMenuRef.current?.querySelectorAll('.selector-item')[next]?.focus();
-      } else if (e.key === 'Enter' && e.target.id === 'fontSelector' && focusedFontIndex >= 0) {
-        e.preventDefault();
-        applyFontSelection(fontOptions[focusedFontIndex].value);
-      }
-    } else if (openedSelector === 'theme') {
+    if (openedSelector === 'theme') {
       if (e.target !== document.getElementById('themeSelector') && !themeMenuRef.current?.contains(e.target)) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -364,14 +287,7 @@ function App() {
         applyThemeSelection(themeOptions[focusedThemeIndex].value);
       }
     }
-  }, [openedSelector, focusedFontIndex, focusedThemeIndex, applyFontSelection, applyThemeSelection]);
-
-  function handleFontItemMouseEnter(index) {
-    if (blockHoverFocusRef.current) {
-      return;
-    }
-    setFocusedFontIndex(index);
-  }
+  }, [openedSelector, focusedThemeIndex, applyThemeSelection]);
 
   function stats(input, composingIndex = -1) {
     const { correct, total, wrongIndices } = analyzeTyping(currentPhrase, input, composingIndex);
@@ -442,6 +358,7 @@ function App() {
 
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
+        if (openedSelector === 'font') document.getElementById('fontSelector')?.focus();
         closeBestMenu();
       } else if (openedSelector === 'font' || openedSelector === 'theme') {
         handleSelectorKeyDown(e);
@@ -472,57 +389,30 @@ function App() {
   }, [openedSelector, handleSelectorKeyDown]);
 
   useEffect(() => {
-    if (openedSelector === 'font' && fontMenuRef.current) {
-      const menu = fontMenuRef.current;
-      const hasScroll = menu.scrollHeight > menu.clientHeight;
-      setShowFontScrollTopIndicator(false);
-      setShowFontScrollBottomIndicator(hasScroll);
-      // Set initial focus to current font
-      const currentIndex = fontOptions.findIndex(opt => opt.value === font);
-      setFocusedFontIndex(currentIndex);
-    } else if (openedSelector === 'theme' && themeMenuRef.current) {
-      // Set initial focus to current theme
-      const currentIndex = themeOptions.findIndex(opt => opt.value === theme);
-      setFocusedThemeIndex(currentIndex);
+    if (openedSelector !== 'font') return;
+    const list = fontListRef.current;
+    focusFontItem(Math.max(0, fontOptions.findIndex(option => option.value === font)));
+    updateFontScrollIndicators(list);
+    const observer = new ResizeObserver(() => updateFontScrollIndicators(list));
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [openedSelector, font, focusFontItem]);
+
+  useEffect(() => {
+    if (openedSelector === 'theme') {
+      setFocusedThemeIndex(themeOptions.findIndex(option => option.value === theme));
     } else {
-      setFocusedFontIndex(-1);
       setFocusedThemeIndex(-1);
     }
-  }, [openedSelector, font, theme]);
+  }, [openedSelector, theme]);
 
   useEffect(() => {
-    if (openedSelector === 'font') {
-      requestAnimationFrame(() => {
-        scrollFocusedSelectorItemIntoView(fontMenuRef, focusedFontIndex, {
-          accountForIndicators: true,
-          onAdjustedScroll: updateFontScrollIndicators,
-        });
-      });
-    } else if (openedSelector === 'theme') {
-      requestAnimationFrame(() => {
-        scrollFocusedSelectorItemIntoView(themeMenuRef, focusedThemeIndex);
-      });
-    }
-  }, [openedSelector, focusedFontIndex, focusedThemeIndex]);
-
-  useEffect(() => {
-    if (openedSelector !== 'font') {
-      blockHoverFocusRef.current = false;
-      return;
-    }
-
-    const onMouseMove = () => {
-      if (blockHoverFocusRef.current) {
-        blockHoverFocusRef.current = false;
-      }
-    };
-
-    window.addEventListener('mousemove', onMouseMove, { passive: true });
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-    };
-  }, [openedSelector]);
+    if (openedSelector !== 'theme') return;
+    const frame = requestAnimationFrame(() => {
+      scrollFocusedSelectorItemIntoView(themeMenuRef, focusedThemeIndex);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [openedSelector, focusedThemeIndex]);
 
   return (
     <>
@@ -571,9 +461,16 @@ function App() {
                 className="selector-trigger"
                 type="button"
                 aria-expanded={openedSelector === 'font'}
-                aria-controls="fontMenu"
+                aria-controls="fontList"
+                aria-haspopup="listbox"
                 aria-label={`글꼴 선택, 현재 ${getFontLabel(font)}`}
                 onClick={() => setOpenedSelector(prev => (prev === 'font' ? '' : 'font'))}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setOpenedSelector('font');
+                  }
+                }}
               >
                 {getFontLabel(font)}
               </button>
@@ -583,39 +480,51 @@ function App() {
                   id="fontMenu"
                   className="selector-menu font-menu"
                   onClick={(e) => e.stopPropagation()}
-                  onScroll={handleFontMenuScroll}
-                  onWheel={handleFontMenuWheel}
+                  onKeyDown={handleFontMenuKeyDown}
                 >
                   <button
                     type="button"
-                    className={`scroll-indicator scroll-indicator-top ${showFontScrollTopIndicator ? '' : 'hidden'}`}
-                    onClick={scrollFontMenuUp}
-                    aria-label="Scroll font menu up"
+                    className="scroll-indicator scroll-indicator-top"
+                    disabled={!showFontScrollTopIndicator}
+                    onClick={() => scrollFontMenu(-1)}
+                    aria-label="글꼴 목록 한 줄 위로"
+                    aria-controls="fontList"
                   >
-                    ▲
+                    <span aria-hidden="true">▲</span>
                   </button>
-                  {fontOptions.map((option, index) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`selector-item ${option.value === font ? 'selected' : ''} ${index === focusedFontIndex ? 'focused' : ''}`}
-                      aria-pressed={option.value === font}
-                      style={{ fontFamily: option.previewFamily }}
-                      onClick={() => applyFontSelection(option.value)}
-                      onFocus={() => setFocusedFontIndex(index)}
-                      onMouseEnter={() => handleFontItemMouseEnter(index)}
-                    >
-                      <span className="selector-check" aria-hidden="true">{option.value === font ? '✓' : ''}</span>
-                      <span>{option.label}</span>
-                    </button>
-                  ))}
+                  <div
+                    ref={fontListRef}
+                    id="fontList"
+                    className="font-menu-list"
+                    role="listbox"
+                    aria-label="글꼴"
+                    onScroll={(e) => updateFontScrollIndicators(e.currentTarget)}
+                  >
+                    {fontOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="option"
+                        tabIndex={-1}
+                        className={`selector-item ${option.value === font ? 'selected' : ''}`}
+                        aria-selected={option.value === font}
+                        style={{ fontFamily: option.previewFamily }}
+                        onClick={() => applyFontSelection(option.value)}
+                      >
+                        <span className="selector-check" aria-hidden="true">{option.value === font ? '✓' : ''}</span>
+                        <span>{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
                   <button
                     type="button"
-                    className={`scroll-indicator scroll-indicator-bottom ${showFontScrollBottomIndicator ? '' : 'hidden'}`}
-                    onClick={scrollFontMenuDown}
-                    aria-label="Scroll font menu down"
+                    className="scroll-indicator scroll-indicator-bottom"
+                    disabled={!showFontScrollBottomIndicator}
+                    onClick={() => scrollFontMenu(1)}
+                    aria-label="글꼴 목록 한 줄 아래로"
+                    aria-controls="fontList"
                   >
-                    ▼
+                    <span aria-hidden="true">▼</span>
                   </button>
                 </div>
               )}
