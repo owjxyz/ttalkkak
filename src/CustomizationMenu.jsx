@@ -12,7 +12,7 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
   const [url, setURL] = useState('')
   const [colors, setColors] = useState({})
   const [shadow, setShadow] = useState(false)
-  const [textShadow, setTextShadow] = useState(false)
+  const [textShadow, setTextShadow] = useState('none')
   const [loadedFont, setLoadedFont] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -80,7 +80,7 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
       setName(saved?.name || '')
       setColors(Object.fromEntries(colorFields.map(([key]) => [key, saved ? saved[key] : body.getPropertyValue(`--theme-${key}`).trim()])))
       setShadow(saved?.shadow === true)
-      setTextShadow(saved?.textShadow === true)
+      setTextShadow(saved?.textShadow || 'none')
     }
     setPage(nextPage)
     setEditing(true)
@@ -200,7 +200,7 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
             <div className="custom-color-label">
               <label htmlFor={`custom-${key}`}>{label}</label>
               {key === 'border' && <button id="toggle-theme-shadow" className="shadow-toggle" type="button" aria-label="패널 그림자" aria-pressed={shadow} onClick={() => setShadow(value => !value)}>Shadow</button>}
-              {key === 'text' && <button id="toggle-theme-text-shadow" className="shadow-toggle" type="button" aria-label="글자 그림자" aria-pressed={textShadow} onClick={() => setTextShadow(value => !value)}>Shadow</button>}
+              {key === 'text' && <button id="toggle-theme-text-shadow" className="shadow-toggle" type="button" aria-label={`글자 그림자: ${textShadow === 'none' ? '없음' : textShadow === 'light' ? 'Light' : 'Dark'}`} aria-pressed={textShadow !== 'none'} onClick={() => setTextShadow(value => value === 'none' ? 'light' : value === 'light' ? 'dark' : 'none')}>{textShadow === 'none' ? 'Shadow' : textShadow === 'light' ? 'Light' : 'Dark'}</button>}
             </div>
             <input type="color" aria-label={`${label} 색상 선택`} value={/^#[\da-f]{6}$/i.test(colors[key]) ? colors[key] : '#000000'} onChange={e => setColors(prev => ({ ...prev, [key]: e.target.value }))} />
             <input id={`custom-${key}`} value={colors[key]} maxLength={7} spellCheck={false} onChange={e => setColors(prev => ({ ...prev, [key]: e.target.value }))} />

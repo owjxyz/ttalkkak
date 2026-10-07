@@ -1,3 +1,5 @@
+import { textShadows } from './themes.js'
+
 export const colorFields = [
   ['background', '화면 배경'],
   ['panel', '패널 배경'],
@@ -40,7 +42,11 @@ export function readCustomization() {
         if (!validName(theme?.name) || !/^custom-theme:[\da-f-]{36}$/.test(theme.id)) continue
         if (!colorFields.every(([key]) => /^#[\da-f]{6}$/i.test(theme[key]))) continue
         if (settings.themes.some(item => item.id === theme.id || item.name === theme.name.trim())) continue
-        settings.themes.push({ id: theme.id, name: theme.name.trim(), ...Object.fromEntries(colorFields.map(([key]) => [key, theme[key]])), shadow: theme.shadow === true, textShadow: theme.textShadow === true })
+        settings.themes.push({
+          id: theme.id, name: theme.name.trim(), ...Object.fromEntries(colorFields.map(([key]) => [key, theme[key]])),
+          shadow: theme.shadow === true,
+          textShadow: theme.textShadow === true ? 'dark' : ['light', 'dark'].includes(theme.textShadow) ? theme.textShadow : 'none',
+        })
       }
     }
   } catch { /* Missing or damaged local settings use the built-in options. */ }
@@ -69,7 +75,7 @@ export function themeVariables(colors) {
     ...Object.fromEntries(colorFields.map(([key]) => [`--theme-${key}`, colors[key]])),
     '--theme-menu-panel': 'var(--theme-panel)', '--theme-selector-background': 'var(--theme-panel)',
     '--theme-menu-input': 'var(--theme-input)',
-    '--theme-text-shadow': colors.textShadow === true ? '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.5)' : 'none',
+    '--theme-text-shadow': ['light', 'dark'].includes(colors.textShadow) ? textShadows[colors.textShadow] : 'none',
     '--theme-info-shadow': 'var(--theme-text-shadow)',
     '--theme-box-shadow': colors.shadow === true ? '0.1em 0.1em 0.2em rgba(0, 0, 0, 0.5)' : 'none',
     '--theme-logo-shadow': 'var(--theme-text-shadow)', '--theme-date-shadow': 'var(--theme-text-shadow)',

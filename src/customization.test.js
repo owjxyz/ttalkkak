@@ -26,14 +26,26 @@ test('saved themes keep separate panel and input colors, including older themes'
     assert.equal(withShadow.shadow, true, 'Panel shadow preference must survive storage')
     assert.notEqual(themeVariables(withShadow)['--theme-box-shadow'], 'none')
     assert.equal(themeVariables(withShadow)['--theme-text-shadow'], 'none', 'Panel shadows must not add text shadows')
-    saved = { themes: [{ ...theme, textShadow: true }] }
-    const withTextShadow = readCustomization().themes[0]
-    assert.equal(withTextShadow.textShadow, true, 'Text shadow preference must survive storage')
-    assert.notEqual(themeVariables(withTextShadow)['--theme-text-shadow'], 'none')
-    assert.equal(themeVariables(withTextShadow)['--theme-box-shadow'], 'none', 'Text shadows must not add panel shadows')
+    for (const [value, mode, css] of [
+      ['light', 'light', '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2)'],
+      ['dark', 'dark', '0.05em 0.05em 0.1em rgba(0, 0, 0, 1)'],
+      [true, 'dark', '0.05em 0.05em 0.1em rgba(0, 0, 0, 1)'],
+      [false, 'none', 'none'],
+      [undefined, 'none', 'none'],
+      ['none', 'none', 'none'],
+      ['invalid', 'none', 'none'],
+      ['toString', 'none', 'none'],
+      [['light'], 'none', 'none'],
+    ]) {
+      saved = { themes: [{ ...theme, textShadow: value }] }
+      const restoredShadow = readCustomization().themes[0]
+      assert.equal(restoredShadow.textShadow, mode, 'Text shadow mode must survive storage or migrate safely')
+      assert.equal(themeVariables(restoredShadow)['--theme-text-shadow'], css, 'Text shadow must use the built-in strength')
+      assert.equal(themeVariables(restoredShadow)['--theme-box-shadow'], 'none', 'Text shadows must not add panel shadows')
+    }
     saved = { themes: [{ ...theme, shadow: 'true' }] }
     assert.equal(readCustomization().themes[0].shadow, false, 'Invalid shadow preferences must use the safe default')
-    assert.equal(readCustomization().themes[0].textShadow, false, 'Older themes must retain their shadow-free text')
+    assert.equal(readCustomization().themes[0].textShadow, 'none', 'Older themes must retain their shadow-free text')
     saved = { themes: [{ ...theme, input: 'invalid' }] }
     assert.equal(readCustomization().themes.length, 0)
   } finally {

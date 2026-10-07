@@ -49,6 +49,10 @@
         element.dispatchEvent(new Event('input', { bubbles: true }));
         await settle();
       };
+      const cycleTextShadow = async label => {
+        await click('toggle-theme-text-shadow');
+        assert(document.getElementById('toggle-theme-text-shadow').textContent === label, 'Text shadow button must cycle Shadow → Light → Dark');
+      };
       try {
         root.render(React.createElement(App));
         await waitFor(() => document.getElementById('textInput')?.disabled === false);
@@ -99,8 +103,12 @@
         await click('toggle-theme-shadow');
         assert(shadowToggle.getAttribute('aria-pressed') === 'true' && getComputedStyle(document.querySelector('.custom-preview-panel')).boxShadow !== 'none', 'Shadow toggle must update the preview');
         assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow === 'none', 'Panel shadows must not add text shadows');
-        await click('toggle-theme-text-shadow');
-        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow !== 'none', 'Text shadow toggle must update the preview');
+        assert(document.getElementById('toggle-theme-text-shadow').textContent === 'Shadow', 'New custom themes must start with no text shadow');
+        await cycleTextShadow('Light');
+        const lightShadow = getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow;
+        assert(lightShadow.includes('rgba(0, 0, 0, 0.2)'), 'Light shadow must use the built-in light strength');
+        await cycleTextShadow('Dark');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow !== lightShadow, 'Dark shadow must differ from Light');
         Storage.prototype.setItem = function(key, value) {
           if (key === 'Customization') throw new DOMException('Storage full', 'QuotaExceededError');
           return setItem.call(this, key, value);
@@ -113,7 +121,7 @@
         assert(JSON.parse(localStorage.getItem('Customization')).themes[0].background === '#123456', 'Saved colors must persist locally');
         assert(document.body.className === 'custom', 'Save must apply the custom theme');
         assert(JSON.parse(localStorage.getItem('Customization')).themes[0].shadow === true, 'Shadow preference must persist locally');
-        assert(JSON.parse(localStorage.getItem('Customization')).themes[0].textShadow === true, 'Text shadow preference must persist locally');
+        assert(JSON.parse(localStorage.getItem('Customization')).themes[0].textShadow === 'dark', 'Text shadow mode must persist locally');
         assert(getComputedStyle(document.getElementById('textInput')).textShadow !== 'none', 'Saved text shadows must apply to the typing input');
         assert([...document.querySelectorAll('.box')].every(panel => getComputedStyle(panel).boxShadow !== 'none'), 'Saved shadows must apply to practice panels');
         await waitFor(() => getComputedStyle(document.body).backgroundColor === 'rgb(18, 52, 86)');
@@ -182,11 +190,16 @@
         editTheme.click();
         await settle();
         assert(document.getElementById('toggle-theme-shadow').getAttribute('aria-pressed') === 'true', 'Editing after remount must restore the shadow preference');
-        assert(document.getElementById('toggle-theme-text-shadow').getAttribute('aria-pressed') === 'true', 'Editing after remount must restore text shadows');
+        assert(document.getElementById('toggle-theme-text-shadow').textContent === 'Dark', 'Editing after remount must restore the text shadow mode');
         await click('toggle-theme-shadow');
         assert(getComputedStyle(document.querySelector('.custom-preview-panel')).boxShadow === 'none', 'Turning shadows off must update the preview');
         assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow !== 'none', 'Panel toggle must preserve text shadows');
-        await click('toggle-theme-text-shadow');
+        await cycleTextShadow('Shadow');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow === 'none', 'Dark must cycle to no shadow');
+        await cycleTextShadow('Light');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow === lightShadow, 'Editing must allow switching back to Light');
+        await cycleTextShadow('Dark');
+        await cycleTextShadow('Shadow');
         assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow === 'none', 'Turning text shadows off must update the preview');
         await input('custom-theme-name', 'Sea');
         await click('save-custom-theme');

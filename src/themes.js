@@ -1,10 +1,16 @@
+export const textShadows = {
+  none: 'none',
+  light: '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2)',
+  dark: '0.05em 0.05em 0.1em rgba(0, 0, 0, 1)',
+}
+
 const dark = {
   background: '#343434', panel: '#343434', input: '#454545',
   text: '#f3f3f3', border: '#f3f3f3', accent: '#f3f3f3', error: '#ff3333',
   styles: {
     '--theme-menu-panel': '#454545', '--theme-selector-background': '#454545',
     '--theme-info-shadow': '0.05em 0.05em 0.1em rgb(0, 0, 0)',
-    '--theme-text-shadow': '0.05em 0.05em 0.1em rgba(0, 0, 0, 1)',
+    '--theme-text-shadow': textShadows.dark,
     '--theme-box-shadow': '0.1em 0.1em 0.2em rgba(0, 0, 0, 1)',
     '--theme-error-background': 'rgba(255, 75, 75, 0.22)',
     '--theme-placeholder': '#76767a', '--theme-font-hover': 'rgba(255, 255, 255, 0.12)',
@@ -24,7 +30,7 @@ const light = {
     '--theme-menu-panel': '#ffffff',
     '--theme-menu-input': 'var(--theme-menu-panel)',
     '--theme-info-shadow': '0.05em 0.05em 0.1em rgb(0, 0, 0)',
-    '--theme-text-shadow': '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2)',
+    '--theme-text-shadow': textShadows.light,
     '--theme-box-shadow': '0.1em 0.1em 0.2em rgba(0, 0, 0, 0.5)',
     '--theme-error-background': 'rgba(204, 0, 0, 0.16)',
     '--theme-placeholder': '#76767a',
