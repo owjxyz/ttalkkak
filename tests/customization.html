@@ -94,6 +94,13 @@
         await input('custom-input', '#345678');
         assert(getComputedStyle(document.querySelector('.custom-preview-panel')).backgroundColor === 'rgb(35, 69, 103)', 'Preview must show the panel background');
         assert(getComputedStyle(document.querySelector('.custom-preview-input')).backgroundColor === 'rgb(52, 86, 120)', 'Preview must show a separate input background');
+        const shadowToggle = document.getElementById('toggle-theme-shadow');
+        assert(shadowToggle && shadowToggle.getAttribute('aria-pressed') === 'false', 'New custom themes must start without panel shadows');
+        await click('toggle-theme-shadow');
+        assert(shadowToggle.getAttribute('aria-pressed') === 'true' && getComputedStyle(document.querySelector('.custom-preview-panel')).boxShadow !== 'none', 'Shadow toggle must update the preview');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow === 'none', 'Panel shadows must not add text shadows');
+        await click('toggle-theme-text-shadow');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow !== 'none', 'Text shadow toggle must update the preview');
         Storage.prototype.setItem = function(key, value) {
           if (key === 'Customization') throw new DOMException('Storage full', 'QuotaExceededError');
           return setItem.call(this, key, value);
@@ -105,6 +112,10 @@
         await click('save-custom-theme');
         assert(JSON.parse(localStorage.getItem('Customization')).themes[0].background === '#123456', 'Saved colors must persist locally');
         assert(document.body.className === 'custom', 'Save must apply the custom theme');
+        assert(JSON.parse(localStorage.getItem('Customization')).themes[0].shadow === true, 'Shadow preference must persist locally');
+        assert(JSON.parse(localStorage.getItem('Customization')).themes[0].textShadow === true, 'Text shadow preference must persist locally');
+        assert(getComputedStyle(document.getElementById('textInput')).textShadow !== 'none', 'Saved text shadows must apply to the typing input');
+        assert([...document.querySelectorAll('.box')].every(panel => getComputedStyle(panel).boxShadow !== 'none'), 'Saved shadows must apply to practice panels');
         await waitFor(() => getComputedStyle(document.body).backgroundColor === 'rgb(18, 52, 86)');
         assert([...document.querySelectorAll('.box')].every(panel => getComputedStyle(panel).backgroundColor === 'rgb(35, 69, 103)'), 'Panel background must apply to all practice panels');
         await waitFor(() => getComputedStyle(document.getElementById('textInput')).backgroundColor === 'rgb(52, 86, 120)');
@@ -170,8 +181,17 @@
         assert(editTheme, 'Saved presets must have editable list rows');
         editTheme.click();
         await settle();
+        assert(document.getElementById('toggle-theme-shadow').getAttribute('aria-pressed') === 'true', 'Editing after remount must restore the shadow preference');
+        assert(document.getElementById('toggle-theme-text-shadow').getAttribute('aria-pressed') === 'true', 'Editing after remount must restore text shadows');
+        await click('toggle-theme-shadow');
+        assert(getComputedStyle(document.querySelector('.custom-preview-panel')).boxShadow === 'none', 'Turning shadows off must update the preview');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow !== 'none', 'Panel toggle must preserve text shadows');
+        await click('toggle-theme-text-shadow');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow === 'none', 'Turning text shadows off must update the preview');
         await input('custom-theme-name', 'Sea');
         await click('save-custom-theme');
+        assert([...document.querySelectorAll('.box')].every(panel => getComputedStyle(panel).boxShadow === 'none'), 'Turning shadows off must remove saved panel shadows');
+        assert(getComputedStyle(document.getElementById('textInput')).textShadow === 'none', 'Turning text shadows off must remove saved text shadows');
         assert(JSON.parse(localStorage.getItem('Customization')).themes.length === 2, 'Renaming an existing preset must not create a duplicate');
         await click('edit-custom-theme');
         document.querySelector('[aria-label="Sea 삭제"]').focus();

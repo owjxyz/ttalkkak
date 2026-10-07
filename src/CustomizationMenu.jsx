@@ -11,6 +11,8 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
   const [name, setName] = useState('')
   const [url, setURL] = useState('')
   const [colors, setColors] = useState({})
+  const [shadow, setShadow] = useState(false)
+  const [textShadow, setTextShadow] = useState(false)
   const [loadedFont, setLoadedFont] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -75,16 +77,10 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
       setURL(saved?.url || '')
     } else {
       const body = getComputedStyle(document.body)
-      const panel = getComputedStyle(document.getElementById('main-box'))
-      const input = getComputedStyle(document.getElementById('textInput'))
-      const rgbToHex = value => `#${value.match(/\d+/g).slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('')}`
       setName(saved?.name || '')
-      setColors(saved ? Object.fromEntries(colorFields.map(([key]) => [key, saved[key]])) : {
-        background: rgbToHex(body.backgroundColor), panel: rgbToHex(panel.backgroundColor === 'rgba(0, 0, 0, 0)' ? body.backgroundColor : panel.backgroundColor),
-        input: rgbToHex(input.backgroundColor), text: rgbToHex(body.color), border: rgbToHex(input.borderBottomColor),
-        accent: rgbToHex(getComputedStyle(document.querySelector('#logo a')).color),
-        error: document.body.classList.contains('terminal') ? '#ff0080' : document.body.classList.contains('light') ? '#cc0000' : '#ff3333',
-      })
+      setColors(Object.fromEntries(colorFields.map(([key]) => [key, saved ? saved[key] : body.getPropertyValue(`--theme-${key}`).trim()])))
+      setShadow(saved?.shadow === true)
+      setTextShadow(saved?.textShadow === true)
     }
     setPage(nextPage)
     setEditing(true)
@@ -117,7 +113,7 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
         previewFontRef.current = null
       } else {
         if (!colorFields.every(([key]) => /^#[\da-f]{6}$/i.test(colors[key]))) throw new Error('색상은 #RRGGBB 형식으로 입력해 주세요.')
-        onSave('theme', { id: editingId || undefined, name: name.trim(), ...colors })
+        onSave('theme', { id: editingId || undefined, name: name.trim(), ...colors, shadow, textShadow })
       }
       back()
     } catch (failure) { setError(failure.message) }
@@ -149,7 +145,10 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
       if (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom) onClose()
     }}
   >
-    <h2 id="practice-menu-title">{page === 'menu' ? 'ttalkkak' : page === 'font' ? '사용자 지정 글꼴' : '사용자 지정 테마'}</h2>
+    <h2 id="practice-menu-title">
+      {page === 'menu' ? 'ttalkkak' : page === 'font' ? '사용자 지정 글꼴' : '사용자 지정 테마'}
+      {editing && <span className="editor-mode">{editingId ? '편집' : '새 항목'}</span>}
+    </h2>
     {page === 'menu' ? <>
       <div className="practice-menu-actions">
         <button id="edit-custom-font" type="button" onClick={() => openList('font')}>사용자 지정 글꼴</button>
@@ -161,7 +160,6 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
       </div>
     </> : <>
       {!editing ? <div className="saved-presets">
-        <h3>저장한 {page === 'font' ? '글꼴' : '테마'}</h3>
         {settings[page === 'font' ? 'fonts' : 'themes'].length === 0 ? <p className="menu-hint">아직 저장한 항목이 없어요.</p> : <ul>
           {settings[page === 'font' ? 'fonts' : 'themes'].map(item => <li key={item.id}>
             <span className="preset-name">{item.name}</span>
@@ -182,7 +180,6 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
           </li>)}
         </ul>}
       </div> : <>
-      <h3>{editingId ? '편집' : '새 항목'}</h3>
       {page === 'font' ? <>
         <label htmlFor="custom-font-name">글꼴 이름</label>
         <input id="custom-font-name" value={name} maxLength={60} onChange={e => setName(e.target.value)} placeholder="나의 글꼴" />
@@ -200,12 +197,16 @@ export default function CustomizationMenu({ settings, onSave, onDelete, onClose,
         <input id="custom-theme-name" value={name} maxLength={60} onChange={e => setName(e.target.value)} placeholder="나의 테마" />
         <div className="custom-color-fields">
           {colorFields.map(([key, label]) => <div className="custom-color-row" key={key}>
-            <label htmlFor={`custom-${key}`}>{label}</label>
+            <div className="custom-color-label">
+              <label htmlFor={`custom-${key}`}>{label}</label>
+              {key === 'border' && <button id="toggle-theme-shadow" className="shadow-toggle" type="button" aria-label="패널 그림자" aria-pressed={shadow} onClick={() => setShadow(value => !value)}>Shadow</button>}
+              {key === 'text' && <button id="toggle-theme-text-shadow" className="shadow-toggle" type="button" aria-label="글자 그림자" aria-pressed={textShadow} onClick={() => setTextShadow(value => !value)}>Shadow</button>}
+            </div>
             <input type="color" aria-label={`${label} 색상 선택`} value={/^#[\da-f]{6}$/i.test(colors[key]) ? colors[key] : '#000000'} onChange={e => setColors(prev => ({ ...prev, [key]: e.target.value }))} />
             <input id={`custom-${key}`} value={colors[key]} maxLength={7} spellCheck={false} onChange={e => setColors(prev => ({ ...prev, [key]: e.target.value }))} />
           </div>)}
         </div>
-        <div className="custom-theme-preview" style={themeVariables(Object.fromEntries(colorFields.map(([key]) => [key, /^#[\da-f]{6}$/i.test(colors[key]) ? colors[key] : '#000000'])))}>
+        <div className="custom-theme-preview" style={themeVariables({ ...Object.fromEntries(colorFields.map(([key]) => [key, /^#[\da-f]{6}$/i.test(colors[key]) ? colors[key] : '#000000'])), shadow, textShadow })}>
           <span className="custom-preview-logo">ttalkkak</span>
           <div className="custom-preview-panel">작은 <span className="custom-preview-error">리듬</span>으로 이어지는 하루.<div className="custom-preview-input">작은 리듬<span aria-hidden="true">│</span></div><div className="custom-preview-progress" /></div>
         </div>

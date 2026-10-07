@@ -5,6 +5,7 @@ import { analyzeTyping, getActiveIndex, getCharacterAccuracy, stripAdvanceSpace 
 import { loadPhrases, randomOtherIndex } from './phrases.js'
 import CustomizationMenu from './CustomizationMenu.jsx'
 import { loadWebFont, readCustomization, readPreference, themeVariables } from './customization.js'
+import { themeOptions } from './themes.js'
 
 const fontOptions = [
   { value: 'GowunDodum', label: '고운돋움', previewFamily: 'GowunDodum' },
@@ -15,36 +16,6 @@ const fontOptions = [
   { value: 'GalmuriMono11', label: '갈무리', previewFamily: 'GalmuriMono11' },
   { value: 'NeoDunggeunmo', label: 'Neo둥근모', previewFamily: 'NeoDunggeunmo' },
 ];
-
-const themeOptions = [
-  { value: 'dark', label: 'Dark', previewText: '#f3f3f3', previewBg: '#343434', previewShadow: '0.05em 0.05em 0.1em rgba(0, 0, 0, 1)' },
-  { value: 'light', label: 'Light', previewText: '#343434', previewBg: '#f3f3f3', previewShadow: '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2)' },
-  { value: 'system', label: 'System(Auto)', previewText: '#f3f3f3', previewBg: 'linear-gradient(90deg, #343434 0%, #343434 48%, #8f8f8f 50%, #f3f3f3 52%, #f3f3f3 100%)', previewShadow: '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.55)' },
-  { value: 'terminal', label: 'Terminal', previewText: '#00f900', previewBg: '#000000', previewShadow: 'none' },
-  { value: 'telnet', label: 'Telnet', previewText: '#ffffff', previewBg: '#00007d', previewShadow: 'none' },
-];
-
-function changeTabColor(theme, customBackground) {
-  const tabColor = document.querySelector("meta[name=theme-color]");
-  if (theme === 'custom') {
-    tabColor.setAttribute('content', customBackground);
-  } else if (theme === 'dark') {
-    tabColor.setAttribute('content', '#343434');
-  } else if (theme === 'light') {
-    tabColor.setAttribute('content', '#f3f3f3');
-  } else if (theme === 'system') {
-    if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-      tabColor.setAttribute('content', '#f3f3f3');
-    } else {
-      tabColor.setAttribute('content', '#343434');
-    }
-  } else if (theme === 'terminal') {
-    tabColor.setAttribute('content', '#000000');
-  }
-  else if (theme == 'telnet') {
-    tabColor.setAttribute('content', '#00007d');
-  }
-}
 
 /**
  * @param {{ id: string, phrase?: string, inputLength?: number, wrongIndices?: number[], activeIndex?: number, phraseRef?: import('react').RefObject<HTMLDivElement> }} props
@@ -103,7 +74,7 @@ function App() {
   const customTheme = customization.themes.find(item => item.id === theme);
   const fontFamily = customFont ? (webFont?.url === customFont.url ? webFont.face.family : 'GowunDodum') : font;
   const availableFonts = [...fontOptions, ...customization.fonts.map(item => ({ value: item.id, label: item.name, previewFamily: webFont?.url === item.url ? webFont.face.family : 'GowunDodum' }))];
-  const availableThemes = [...themeOptions, ...customization.themes.map(item => ({ value: item.id, label: item.name, previewText: item.text, previewBg: item.panel, previewShadow: 'none' }))];
+  const availableThemes = [...themeOptions, ...customization.themes.map(item => ({ value: item.id, label: item.name, colors: item }))];
   const [currentPhrase, setCurrentPhrase] = useState('');
   const [nextPhrase, setNextPhrase] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -429,15 +400,22 @@ function App() {
 
   useEffect(() => {
     document.body.className = customTheme ? 'custom' : theme;
-    if (customTheme) {
-      for (const [key, value] of Object.entries(themeVariables(customTheme))) document.body.style.setProperty(key, value);
-    }
-    changeTabColor(customTheme ? 'custom' : theme, customTheme?.background);
-    if (theme !== 'system') return;
     const media = window.matchMedia('(prefers-color-scheme: light)');
-    const onChange = () => changeTabColor('system');
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
+    let variables = {};
+    const applyColors = () => {
+      const value = theme === 'system' ? (media.matches ? 'light' : 'dark') : theme;
+      const colors = customTheme || themeOptions.find(option => option.value === value).colors;
+      Object.keys(variables).forEach(key => document.body.style.removeProperty(key));
+      variables = themeVariables(colors);
+      Object.entries(variables).forEach(([key, color]) => document.body.style.setProperty(key, color));
+      document.querySelector('meta[name=theme-color]')?.setAttribute('content', colors.background);
+    };
+    applyColors();
+    if (theme === 'system') media.addEventListener('change', applyColors);
+    return () => {
+      media.removeEventListener('change', applyColors);
+      Object.keys(variables).forEach(key => document.body.style.removeProperty(key));
+    };
   }, [theme, customTheme]);
 
   useEffect(() => {
@@ -673,11 +651,7 @@ function App() {
                       className={`selector-item ${option.value === theme ? 'selected' : ''} ${index === focusedThemeIndex ? 'focused' : ''}`}
                       aria-pressed={option.value === theme}
                       data-theme={option.value}
-                      style={{
-                        color: option.previewText,
-                        background: option.previewBg,
-                        textShadow: option.previewShadow,
-                      }}
+                      style={themeVariables(option.colors)}
                       onClick={() => applyThemeSelection(option.value)}
                       onFocus={() => setFocusedThemeIndex(index)}
                       onMouseEnter={() => setFocusedThemeIndex(index)}

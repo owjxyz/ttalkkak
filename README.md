@@ -84,7 +84,10 @@ pnpm run deploy
 
 검사: `pnpm test`, `pnpm lint`, `pnpm build`
 
-브라우저 회귀 검증: 개발 서버에서 `/ttalkkak/tests/font-menu.html`, `/ttalkkak/tests/customization.html`을 열면 PASS/FAIL을 표시합니다. 커스텀 글꼴은 외부 사용(CORS)이 허용된 HTTPS 폰트 파일 URL을 사용합니다.
+브라우저 회귀 검증: 개발 서버에서 `/ttalkkak/tests/font-menu.html`, `/ttalkkak/tests/customization.html`, `/ttalkkak/tests/themes.html`을 열면 PASS/FAIL을 표시합니다. 커스텀 글꼴은 외부 사용(CORS)이 허용된 HTTPS 폰트 파일 URL을 사용합니다.
+
+기본 테마 팔레트는 `src/themes.js`에서 관리합니다. 기본·자동·사용자 지정 테마는 같은 `--theme-*` CSS 변수를 사용하며, Theme Selector의 미리보기와 브라우저 상단 색상도 같은 팔레트를 따릅니다.
+사용자 지정 테마의 테두리와 글자 옆 `Shadow` 버튼으로 패널·글자 그림자를 각각 켜거나 끌 수 있으며, 테마마다 설정이 저장됩니다.
 
 ## 📁 프로젝트 구조
 

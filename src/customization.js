@@ -1,8 +1,8 @@
 export const colorFields = [
   ['background', '화면 배경'],
   ['panel', '패널 배경'],
-  ['input', '텍스트 입력란 배경'],
-  ['text', '기본 글자'],
+  ['input', '입력란 배경'],
+  ['text', '글자'],
   ['border', '테두리'],
   ['accent', '강조색'],
   ['error', '오타색'],
@@ -40,7 +40,7 @@ export function readCustomization() {
         if (!validName(theme?.name) || !/^custom-theme:[\da-f-]{36}$/.test(theme.id)) continue
         if (!colorFields.every(([key]) => /^#[\da-f]{6}$/i.test(theme[key]))) continue
         if (settings.themes.some(item => item.id === theme.id || item.name === theme.name.trim())) continue
-        settings.themes.push({ id: theme.id, name: theme.name.trim(), ...Object.fromEntries(colorFields.map(([key]) => [key, theme[key]])) })
+        settings.themes.push({ id: theme.id, name: theme.name.trim(), ...Object.fromEntries(colorFields.map(([key]) => [key, theme[key]])), shadow: theme.shadow === true, textShadow: theme.textShadow === true })
       }
     }
   } catch { /* Missing or damaged local settings use the built-in options. */ }
@@ -65,5 +65,27 @@ export async function loadWebFont(value) {
 }
 
 export function themeVariables(colors) {
-  return Object.fromEntries(colorFields.map(([key]) => [`--custom-${key}`, colors[key]]))
+  return {
+    ...Object.fromEntries(colorFields.map(([key]) => [`--theme-${key}`, colors[key]])),
+    '--theme-menu-panel': 'var(--theme-panel)', '--theme-selector-background': 'var(--theme-panel)',
+    '--theme-menu-input': 'var(--theme-input)',
+    '--theme-text-shadow': colors.textShadow === true ? '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.5)' : 'none',
+    '--theme-info-shadow': 'var(--theme-text-shadow)',
+    '--theme-box-shadow': colors.shadow === true ? '0.1em 0.1em 0.2em rgba(0, 0, 0, 0.5)' : 'none',
+    '--theme-logo-shadow': 'var(--theme-text-shadow)', '--theme-date-shadow': 'var(--theme-text-shadow)',
+    '--theme-error-background': 'color-mix(in srgb, var(--theme-error), transparent 80%)',
+    '--theme-progress-track': 'rgba(150, 150, 150, 0.3)',
+    '--theme-placeholder': 'color-mix(in srgb, var(--theme-text), transparent 45%)',
+    '--theme-selection': 'var(--theme-accent)', '--theme-selection-text': 'var(--theme-background)',
+    '--theme-font-hover': 'color-mix(in srgb, var(--theme-text), transparent 88%)',
+    '--theme-best-hover': 'color-mix(in srgb, var(--theme-text), transparent 88%)',
+    '--theme-selector-focus': 'color-mix(in srgb, var(--theme-text), transparent 80%)',
+    '--theme-selector-outline': 'color-mix(in srgb, var(--theme-text), transparent 60%)',
+    '--theme-separator': 'color-mix(in srgb, var(--theme-text), transparent 80%)',
+    '--theme-preview-background': 'var(--theme-panel)', '--theme-preview-text-shadow': 'var(--theme-text-shadow)',
+    '--theme-preview-filter': 'brightness(1.1)',
+    '--theme-preview-outline': 'color-mix(in srgb, var(--theme-text), transparent 40%)',
+    '--theme-preview-shadow': '0 0 8px color-mix(in srgb, var(--theme-text), transparent 60%)',
+    ...colors.styles,
+  }
 }
