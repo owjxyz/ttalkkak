@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#343434">
+    <title>Theme variables regression check</title>
+    <style>body, #textInput { transition: none !important; }</style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <pre id="result" style="position:fixed;top:0;left:0;z-index:99999;white-space:pre-wrap"></pre>
+    <script type="module">
+      // Run npm run dev and open /ttalkkak/tests/themes.html.
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import '../src/index.css';
+      const keys = ['Theme', 'Customization'];
+      const backup = keys.map(key => localStorage.getItem(key));
+      const originalMatchMedia = window.matchMedia.bind(window);
+      const media = { matches: false, listeners: new Set(), addEventListener(type, listener) { this.listeners.add(listener); }, removeEventListener(type, listener) { this.listeners.delete(listener); } };
+      window.matchMedia = query => query === '(prefers-color-scheme: light)' ? media : originalMatchMedia(query);
+      const custom = {
+        id: 'custom-theme:00000000-0000-4000-8000-000000000001', name: 'My theme',
+        background: '#112233', panel: '#223344', input: '#334455',
+        text: '#abcdef', border: '#56789a', accent: '#89abcd', error: '#ef5678',
+      };
+      localStorage.setItem('Theme', 'dark');
+      localStorage.setItem('Customization', JSON.stringify({ fonts: [], themes: [custom] }));
+      const { default: App } = await import('../src/App.jsx');
+      const root = createRoot(document.getElementById('root'));
+      const assert = (ok, message) => { if (!ok) throw new Error(message); };
+      const settle = async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); };
+      const waitFor = async predicate => {
+        for (let i = 0; i < 300; i++) {
+          if (predicate()) return;
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        throw new Error('Timed out waiting for UI');
+      };
+      const rgb = hex => `rgb(${hex.slice(1).match(/../g).map(part => parseInt(part, 16)).join(', ')})`;
+      const samples = {
+        dark: { background: '#343434', input: '#454545', text: '#f3f3f3', error: '#ff3333', menu: '#454545' },
+        light: { background: '#f3f3f3', input: '#f3f3f3', text: '#343434', error: '#cc0000', menu: '#ffffff' },
+        terminal: { background: '#000000', input: '#000000', text: '#00f900', error: '#ff0080', menu: '#000000' },
+        telnet: { background: '#00007d', input: '#00007d', text: '#ffffff', error: '#ff6666', menu: '#00007d' },
+      };
+      async function checkTheme(sample) {
+        const body = getComputedStyle(document.body);
+        assert(body.getPropertyValue('--theme-background').trim() === sample.background, 'Active themes must expose a shared background variable');
+        assert(body.backgroundColor === rgb(sample.background) && body.color === rgb(sample.text), 'Page colors must match the selected theme');
+        const panel = sample.panel || sample.background;
+        assert([...document.querySelectorAll('.box')].every(item => getComputedStyle(item).backgroundColor === rgb(panel)), 'Practice panels must use the panel variable');
+        const input = getComputedStyle(document.getElementById('textInput'));
+        assert(input.backgroundColor === rgb(sample.input) && input.color === rgb(sample.text), 'Typing input must use the selected input and text variables');
+        assert(input.caretColor === rgb(sample.accent || sample.text) && input.borderBottomColor === rgb(sample.border || sample.text), 'Caret and border must follow the theme');
+        assert(getComputedStyle(document.querySelector('#logo a')).color === rgb(sample.accent || sample.text), 'Logo must use the accent variable');
+        assert(getComputedStyle(document.querySelector('.word.active'), '::after').borderBottomColor === rgb(sample.accent || sample.text), 'Active character marker must use the accent variable');
+        assert(getComputedStyle(document.querySelector('.wrong')).color === rgb(sample.error), 'Typing errors must use the error variable');
+        const infoShadow = getComputedStyle(document.getElementById('info')).textShadow;
+        assert(sample.id ? infoShadow === 'none' : infoShadow.startsWith('rgb(0, 0, 0)'), 'Footer shadows must retain their built-in and custom styles');
+        assert(document.querySelector('meta[name="theme-color"]').content === sample.background, 'Browser theme color must use the same palette');
+        document.getElementById('themeSelector').click(); await settle();
+        for (const [value, colors] of Object.entries(samples)) {
+          const row = getComputedStyle(document.querySelector(`[data-theme="${value}"]`));
+          assert(row.color === rgb(colors.text) && row.backgroundColor === rgb(colors.background), 'Built-in selector previews must keep their own palettes');
+        }
+        const customRow = getComputedStyle(document.querySelector(`[data-theme="${custom.id}"]`));
+        assert(customRow.color === rgb(custom.text) && customRow.backgroundColor === rgb(custom.panel), 'Custom selector previews must keep their own palettes');
+        assert(getComputedStyle(document.querySelector('[data-theme="system"]')).backgroundImage.includes('linear-gradient'), 'System preview must retain its split background');
+        document.getElementById('textInput').click(); await settle();
+        document.getElementById('date').click(); await settle();
+        assert(getComputedStyle(document.querySelector('dialog')).backgroundColor === rgb(sample.background), 'ESC menu must follow the active palette');
+        assert(getComputedStyle(document.getElementById('resume-practice')).backgroundColor === rgb(sample.menu || sample.panel), 'ESC buttons must follow the active panel palette');
+        document.getElementById('edit-custom-theme').click(); await settle();
+        document.getElementById('new-custom-theme').click(); await settle();
+        assert(getComputedStyle(document.getElementById('custom-theme-name')).backgroundColor === rgb(sample.menu || sample.input), 'ESC editor inputs must retain their palette');
+        const defaults = { panel: sample.background, border: sample.text, accent: sample.text, ...sample };
+        for (const key of ['background', 'panel', 'input', 'text', 'border', 'accent', 'error']) {
+          assert(document.getElementById(`custom-${key}`).value === defaults[key], 'New theme defaults must use the active palette');
+        }
+        for (let i = 0; i < 3; i++) {
+          document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+          await settle();
+        }
+      }
+      async function select(value) {
+        document.getElementById('themeSelector').click(); await settle();
+        document.querySelector(`[data-theme="${value}"]`).click(); await settle();
+      }
+      try {
+        root.render(React.createElement(App));
+        await waitFor(() => document.getElementById('textInput')?.disabled === false);
+        const input = document.getElementById('textInput');
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, '!');
+        input.dispatchEvent(new Event('input', { bubbles: true })); await settle();
+        for (const [value, sample] of Object.entries(samples)) {
+          await select(value); await checkTheme(sample);
+        }
+        await select(custom.id); await checkTheme(custom);
+        await select('system'); await checkTheme(samples.dark);
+        media.matches = true;
+        media.listeners.forEach(listener => listener()); await settle();
+        await checkTheme(samples.light);
+        assert(localStorage.getItem('Theme') === 'system', 'OS changes must preserve the System preference');
+        media.matches = false;
+        media.listeners.forEach(listener => listener()); await settle();
+        await checkTheme(samples.dark);
+        await select(custom.id); await checkTheme(custom);
+        assert(media.listeners.size === 0, 'Leaving System must remove its OS listener');
+        document.getElementById('result').textContent = 'PASS: built-in/custom palettes, selector previews, ESC defaults, metadata and System light/dark changes';
+      } catch (error) {
+        document.getElementById('result').textContent = `FAIL: ${error.message}`;
+        console.error(error);
+      } finally {
+        root.unmount();
+        window.matchMedia = originalMatchMedia;
+        keys.forEach((key, index) => backup[index] === null ? localStorage.removeItem(key) : localStorage.setItem(key, backup[index]));
+      }
+    </script>
+  </body>
+</html>

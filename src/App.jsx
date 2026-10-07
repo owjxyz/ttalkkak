@@ -3,6 +3,9 @@ import { useEffect } from 'react';
 import './App.css'
 import { analyzeTyping, getActiveIndex, getCharacterAccuracy, stripAdvanceSpace } from './typing.js'
 import { loadPhrases, randomOtherIndex } from './phrases.js'
+import CustomizationMenu from './CustomizationMenu.jsx'
+import { loadWebFont, readCustomization, readPreference, themeVariables } from './customization.js'
+import { themeOptions } from './themes.js'
 
 const fontOptions = [
   { value: 'GowunDodum', label: '고운돋움', previewFamily: 'GowunDodum' },
@@ -13,34 +16,6 @@ const fontOptions = [
   { value: 'GalmuriMono11', label: '갈무리', previewFamily: 'GalmuriMono11' },
   { value: 'NeoDunggeunmo', label: 'Neo둥근모', previewFamily: 'NeoDunggeunmo' },
 ];
-
-const themeOptions = [
-  { value: 'dark', label: 'Dark', previewText: '#f3f3f3', previewBg: '#343434', previewShadow: '0.05em 0.05em 0.1em rgba(0, 0, 0, 1)' },
-  { value: 'light', label: 'Light', previewText: '#343434', previewBg: '#f3f3f3', previewShadow: '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.2)' },
-  { value: 'system', label: 'System(Auto)', previewText: '#f3f3f3', previewBg: 'linear-gradient(90deg, #343434 0%, #343434 48%, #8f8f8f 50%, #f3f3f3 52%, #f3f3f3 100%)', previewShadow: '0.05em 0.05em 0.1em rgba(0, 0, 0, 0.55)' },
-  { value: 'terminal', label: 'Terminal', previewText: '#00f900', previewBg: '#000000', previewShadow: 'none' },
-  { value: 'telnet', label: 'Telnet', previewText: '#ffffff', previewBg: '#00007d', previewShadow: 'none' },
-];
-
-function changeTabColor(theme) {
-  const tabColor = document.querySelector("meta[name=theme-color]");
-  if (theme === 'dark') {
-    tabColor.setAttribute('content', '#343434');
-  } else if (theme === 'light') {
-    tabColor.setAttribute('content', '#f3f3f3');
-  } else if (theme === 'system') {
-    if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-      tabColor.setAttribute('content', '#f3f3f3');
-    } else {
-      tabColor.setAttribute('content', '#343434');
-    }
-  } else if (theme === 'terminal') {
-    tabColor.setAttribute('content', '#000000');
-  }
-  else if (theme == 'telnet') {
-    tabColor.setAttribute('content', '#00007d');
-  }
-}
 
 /**
  * @param {{ id: string, phrase?: string, inputLength?: number, wrongIndices?: number[], activeIndex?: number, phraseRef?: import('react').RefObject<HTMLDivElement> }} props
@@ -64,10 +39,6 @@ function Phrase(props) {
 }
 /* eslint-enable react/prop-types */
 
-const savedFont = localStorage.getItem('Font');
-const savedTheme = localStorage.getItem('Theme');
-const savedBest = localStorage.getItem('Best');
-
 function App() {
   const [text, setText] = useState('');
   const todayDateText = new Intl.DateTimeFormat('ko-KR', {
@@ -84,8 +55,26 @@ function App() {
   const composingRef = useRef(false);
   const pendingSpaceRef = useRef(null);
 
-  const [font, setFont] = useState((savedFont !== null) ? savedFont : 'GowunDodum');
-  const [theme, setTheme] = useState((savedTheme !== null) ? savedTheme : 'dark');
+  const [customization, setCustomization] = useState(readCustomization);
+  const [font, setFont] = useState(() => {
+    const saved = readPreference('Font', 'GowunDodum');
+    return fontOptions.some(option => option.value === saved) || customization.fonts.some(item => item.id === saved) ? saved : 'GowunDodum';
+  });
+  const [theme, setTheme] = useState(() => {
+    const saved = readPreference('Theme', 'dark');
+    return themeOptions.some(option => option.value === saved) || customization.themes.some(item => item.id === saved) ? saved : 'dark';
+  });
+  const [webFont, setWebFont] = useState(null);
+  const [settingsError, setSettingsError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const pausedAtRef = useRef(null);
+  const returnFocusRef = useRef(null);
+  const inputSelectionRef = useRef(null);
+  const customFont = customization.fonts.find(item => item.id === font);
+  const customTheme = customization.themes.find(item => item.id === theme);
+  const fontFamily = customFont ? (webFont?.url === customFont.url ? webFont.face.family : 'GowunDodum') : font;
+  const availableFonts = [...fontOptions, ...customization.fonts.map(item => ({ value: item.id, label: item.name, previewFamily: webFont?.url === item.url ? webFont.face.family : 'GowunDodum' }))];
+  const availableThemes = [...themeOptions, ...customization.themes.map(item => ({ value: item.id, label: item.name, colors: item }))];
   const [currentPhrase, setCurrentPhrase] = useState('');
   const [nextPhrase, setNextPhrase] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -94,7 +83,7 @@ function App() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isComposing, setIsComposing] = useState(false);
 
-  const [best, setBest] = useState((savedBest !== null) ? savedBest : '0');
+  const [best, setBest] = useState(() => readPreference('Best', '0'));
   const [cCPM, setCCPM] = useState('0');
   const [accuracy, setAccuracy] = useState('100');
   const [bestMenu, setBestMenu] = useState({ visible: false, x: 0, y: 0 });
@@ -109,6 +98,96 @@ function App() {
   const fontMenuRef = useRef(null);
   const themeMenuRef = useRef(null);
   const fontListRef = useRef(null);
+  const openMenu = useCallback(() => {
+    if (pausedAtRef.current !== null) return;
+    returnFocusRef.current = document.activeElement;
+    const input = textInputRef.current;
+    inputSelectionRef.current = input ? [input.selectionStart, input.selectionEnd, input.selectionDirection] : null;
+    pausedAtRef.current = Date.now();
+    pendingSpaceRef.current = null;
+    setOpenedSelector('');
+    setBestMenu(prev => ({ ...prev, visible: false }));
+    setMenuOpen(true);
+  }, []);
+
+  const closeMenu = useCallback(() => {
+    if (pausedAtRef.current === null) return;
+    if (hasTypingStartedRef.current) phraseStartTimeRef.current += Date.now() - pausedAtRef.current;
+    pausedAtRef.current = null;
+    document.getElementById('practice-menu')?.close();
+    setMenuOpen(false);
+    const target = returnFocusRef.current?.id === 'date' ? textInputRef.current : returnFocusRef.current;
+    target?.focus({ preventScroll: true });
+    if (target === textInputRef.current && inputSelectionRef.current) target.setSelectionRange(...inputSelectionRef.current);
+  }, []);
+
+  function persistCustomization(next, preferenceKey, selection) {
+    const previous = readPreference(preferenceKey, null);
+    try {
+      localStorage.setItem(preferenceKey, selection);
+      localStorage.setItem('Customization', JSON.stringify(next));
+    } catch {
+      try {
+        if (previous === null) localStorage.removeItem(preferenceKey);
+        else localStorage.setItem(preferenceKey, previous);
+      } catch { /* Storage may be entirely unavailable. Keep the active settings. */ }
+      throw new Error('설정을 저장하지 못했습니다. 브라우저 저장 공간을 확인해 주세요.');
+    }
+    setCustomization(next);
+    setFont(current => current.startsWith('custom-font:') && !next.fonts.some(item => item.id === current) ? 'GowunDodum' : current);
+    setTheme(current => current.startsWith('custom-theme:') && !next.themes.some(item => item.id === current) ? 'dark' : current);
+    setSettingsError('');
+  }
+
+  function saveCustomization(kind, value, face) {
+    const latest = readCustomization();
+    const listKey = kind === 'font' ? 'fonts' : 'themes';
+    const existing = latest[listKey].find(item => value.id ? item.id === value.id : item.name === value.name);
+    if (value.id && !existing) throw new Error('다른 창에서 삭제된 항목입니다. 새 항목으로 저장해 주세요.');
+    if (latest[listKey].some(item => item.name === value.name && item.id !== existing?.id)) throw new Error('이미 사용 중인 이름입니다. 다른 이름을 입력해 주세요.');
+    const item = { ...value, id: existing?.id || `custom-${kind}:${crypto.randomUUID()}` };
+    const next = { ...latest, [listKey]: existing ? latest[listKey].map(saved => saved.id === existing.id ? item : saved) : [...latest[listKey], item] };
+    persistCustomization(next, kind === 'font' ? 'Font' : 'Theme', item.id);
+    if (kind === 'font') {
+      setWebFont({ url: value.url, face });
+      setFont(item.id);
+      setIsPixel(false);
+    } else setTheme(item.id);
+  }
+
+  function deleteCustomization(kind, id) {
+    const latest = readCustomization();
+    const listKey = kind === 'font' ? 'fonts' : 'themes';
+    const next = { ...latest, [listKey]: latest[listKey].filter(item => item.id !== id) };
+    const selection = kind === 'font'
+      ? (fontOptions.some(item => item.value === font) || next.fonts.some(item => item.id === font) ? font : 'GowunDodum')
+      : (themeOptions.some(item => item.value === theme) || next.themes.some(item => item.id === theme) ? theme : 'dark');
+    persistCustomization(next, kind === 'font' ? 'Font' : 'Theme', selection);
+    if (kind === 'font') {
+      setFont(selection);
+      if (font === id) { setWebFont(null); setIsPixel(false); }
+    } else setTheme(selection);
+  }
+
+  useEffect(() => {
+    if (!customFont || webFont?.url === customFont.url) return;
+    let cancelled = false;
+    loadWebFont(customFont.url).then(face => {
+      if (!cancelled) setWebFont({ url: customFont.url, face });
+    }).catch(error => {
+      if (cancelled) return;
+      setSettingsError(error.message);
+      setFont('GowunDodum');
+    });
+    return () => { cancelled = true; };
+  }, [customFont, webFont]);
+
+  useEffect(() => {
+    if (!webFont) return;
+    document.fonts.add(webFont.face);
+    return () => { document.fonts.delete(webFont.face); };
+  }, [webFont]);
+
   const showPhrasePair = useCallback(() => {
     const indices = indexListRef.current;
     const phrases = phrasesRef.current;
@@ -165,7 +244,7 @@ function App() {
     if (!hasTypingStartedRef.current) {
       return 0;
     }
-    const elapsedSeconds = Math.max((Date.now() - phraseStartTimeRef.current) / 1000, 1);
+    const elapsedSeconds = Math.max(((pausedAtRef.current ?? Date.now()) - phraseStartTimeRef.current) / 1000, 1);
     return Math.floor((correct * 60) / elapsedSeconds);
   }
 
@@ -179,30 +258,32 @@ function App() {
   }
 
   const applyFontSelection = useCallback((nextFont) => {
+    try { localStorage.setItem('Font', nextFont); }
+    catch { setSettingsError('글꼴 선택을 저장하지 못했습니다. 브라우저 저장 공간을 확인해 주세요.'); return; }
     if ((nextFont === 'GalmuriMono11') || (nextFont === 'NeoDunggeunmo')) {
       setIsPixel(true);
     } else {
       setIsPixel(false);
     }
     setFont(nextFont);
-    localStorage.setItem('Font', nextFont);
     setOpenedSelector('');
     document.getElementById('fontSelector')?.focus();
   }, []);
 
   const applyThemeSelection = useCallback((nextTheme) => {
+    try { localStorage.setItem('Theme', nextTheme); }
+    catch { setSettingsError('테마 선택을 저장하지 못했습니다. 브라우저 저장 공간을 확인해 주세요.'); return; }
     setTheme(nextTheme);
-    localStorage.setItem('Theme', nextTheme);
     setOpenedSelector('');
   }, []);
 
   function getFontLabel(fontValue) {
-    const matchedFont = fontOptions.find(option => option.value === fontValue);
+    const matchedFont = availableFonts.find(option => option.value === fontValue);
     return matchedFont ? matchedFont.label : fontValue;
   }
 
   function getThemeLabel(themeValue) {
-    const matchedTheme = themeOptions.find(option => option.value === themeValue);
+    const matchedTheme = availableThemes.find(option => option.value === themeValue);
     return matchedTheme ? matchedTheme.label : themeValue;
   }
 
@@ -259,35 +340,30 @@ function App() {
     }
   }
 
-  function handleThemeMenuWheel(e) {
-    // Theme menu should not trigger scroll interactions.
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
   function scrollFocusedSelectorItemIntoView(menuRef, focusedIndex) {
     menuRef.current?.querySelectorAll('.selector-item')[focusedIndex]?.scrollIntoView({ block: 'nearest' });
   }
 
   const handleSelectorKeyDown = useCallback((e) => {
+    const availableThemes = [...themeOptions, ...customization.themes.map(item => ({ value: item.id }))];
     if (openedSelector === 'theme') {
       if (e.target !== document.getElementById('themeSelector') && !themeMenuRef.current?.contains(e.target)) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        const next = (focusedThemeIndex + 1) % themeOptions.length;
+        const next = (focusedThemeIndex + 1) % availableThemes.length;
         setFocusedThemeIndex(next);
         themeMenuRef.current?.querySelectorAll('.selector-item')[next]?.focus();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        const next = (focusedThemeIndex - 1 + themeOptions.length) % themeOptions.length;
+        const next = (focusedThemeIndex - 1 + availableThemes.length) % availableThemes.length;
         setFocusedThemeIndex(next);
         themeMenuRef.current?.querySelectorAll('.selector-item')[next]?.focus();
       } else if (e.key === 'Enter' && e.target.id === 'themeSelector' && focusedThemeIndex >= 0) {
         e.preventDefault();
-        applyThemeSelection(themeOptions[focusedThemeIndex].value);
+        applyThemeSelection(availableThemes[focusedThemeIndex].value);
       }
     }
-  }, [openedSelector, focusedThemeIndex, applyThemeSelection]);
+  }, [openedSelector, focusedThemeIndex, applyThemeSelection, customization.themes]);
 
   function stats(input, composingIndex = -1) {
     const { correct, total, wrongIndices } = analyzeTyping(currentPhrase, input, composingIndex);
@@ -323,21 +399,32 @@ function App() {
   }, [showPhrasePair, loadAttempt]);
 
   useEffect(() => {
-    document.body.className = theme;
-    changeTabColor(theme);
-    if (theme !== 'system') return;
+    document.body.className = customTheme ? 'custom' : theme;
     const media = window.matchMedia('(prefers-color-scheme: light)');
-    const onChange = () => changeTabColor('system');
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
-  }, [theme]);
+    let variables = {};
+    const applyColors = () => {
+      const value = theme === 'system' ? (media.matches ? 'light' : 'dark') : theme;
+      const colors = customTheme || themeOptions.find(option => option.value === value).colors;
+      Object.keys(variables).forEach(key => document.body.style.removeProperty(key));
+      variables = themeVariables(colors);
+      Object.entries(variables).forEach(([key, color]) => document.body.style.setProperty(key, color));
+      document.querySelector('meta[name=theme-color]')?.setAttribute('content', colors.background);
+    };
+    applyColors();
+    if (theme === 'system') media.addEventListener('change', applyColors);
+    return () => {
+      media.removeEventListener('change', applyColors);
+      Object.keys(variables).forEach(key => document.body.style.removeProperty(key));
+    };
+  }, [theme, customTheme]);
 
   useEffect(() => {
-    if (currentPhrase) textInputRef.current?.focus();
+    if (currentPhrase && pausedAtRef.current === null) textInputRef.current?.focus();
   }, [currentPhrase]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
+      if (pausedAtRef.current !== null) return;
       if (latestCorrectRef.current === 0) {
         setCCPM('0');
         return;
@@ -358,8 +445,13 @@ function App() {
 
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (openedSelector === 'font') document.getElementById('fontSelector')?.focus();
-        closeBestMenu();
+        if (e.defaultPrevented || e.repeat || e.isComposing || composingRef.current || e.keyCode === 229 || menuOpen) return;
+        e.preventDefault();
+        if (openedSelector || bestMenu.visible) {
+          if (openedSelector) document.getElementById(`${openedSelector}Selector`)?.focus();
+          else document.getElementById('best')?.focus();
+          closeBestMenu();
+        } else openMenu();
       } else if (openedSelector === 'font' || openedSelector === 'theme') {
         handleSelectorKeyDown(e);
       }
@@ -386,25 +478,25 @@ function App() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('scroll', onScroll, true);
     };
-  }, [openedSelector, handleSelectorKeyDown]);
+  }, [openedSelector, handleSelectorKeyDown, bestMenu.visible, menuOpen, openMenu]);
 
   useEffect(() => {
     if (openedSelector !== 'font') return;
     const list = fontListRef.current;
-    focusFontItem(Math.max(0, fontOptions.findIndex(option => option.value === font)));
+    focusFontItem(Math.max(0, [...fontOptions.map(option => option.value), ...customization.fonts.map(item => item.id)].indexOf(font)));
     updateFontScrollIndicators(list);
     const observer = new ResizeObserver(() => updateFontScrollIndicators(list));
     observer.observe(list);
     return () => observer.disconnect();
-  }, [openedSelector, font, focusFontItem]);
+  }, [openedSelector, font, focusFontItem, customization.fonts]);
 
   useEffect(() => {
     if (openedSelector === 'theme') {
-      setFocusedThemeIndex(themeOptions.findIndex(option => option.value === theme));
+      setFocusedThemeIndex([...themeOptions.map(option => option.value), ...customization.themes.map(item => item.id)].indexOf(theme));
     } else {
       setFocusedThemeIndex(-1);
     }
-  }, [openedSelector, theme]);
+  }, [openedSelector, theme, customization.themes]);
 
   useEffect(() => {
     if (openedSelector !== 'theme') return;
@@ -416,7 +508,7 @@ function App() {
 
   return (
     <>
-      <div id="boxes" style={{ fontFamily: font }} className={isPixel ? 'pixel' : ''}>
+      <div id="boxes" style={{ fontFamily: fontFamily }} className={isPixel ? 'pixel' : ''}>
         <div id="header-box">
           <div id="info">
             <h1 id="logo">
@@ -426,7 +518,10 @@ function App() {
                 document.getElementById('textInput').focus();
               }}>ttalkkak</a>
             </h1>
-            <div id="date">{todayDateText}</div>
+            <button id="date" type="button" onClick={openMenu} aria-label={`설정 메뉴 열기, ${todayDateText}`} aria-haspopup="dialog" aria-expanded={menuOpen} aria-controls="practice-menu">
+              <span className="date-value" aria-hidden="true">{todayDateText}</span>
+              <span className="date-settings" aria-hidden="true">Settings</span>
+            </button>
           </div>
 
           <div id="stats" className="box">
@@ -500,7 +595,7 @@ function App() {
                     aria-label="글꼴"
                     onScroll={(e) => updateFontScrollIndicators(e.currentTarget)}
                   >
-                    {fontOptions.map((option) => (
+                    {availableFonts.map((option) => (
                       <button
                         key={option.value}
                         type="button"
@@ -548,20 +643,15 @@ function App() {
                   id="themeMenu"
                   className="selector-menu theme-menu"
                   onClick={(e) => e.stopPropagation()}
-                  onWheel={handleThemeMenuWheel}
                 >
-                  {themeOptions.map((option, index) => (
+                  {availableThemes.map((option, index) => (
                     <button
                       key={option.value}
                       type="button"
                       className={`selector-item ${option.value === theme ? 'selected' : ''} ${index === focusedThemeIndex ? 'focused' : ''}`}
                       aria-pressed={option.value === theme}
                       data-theme={option.value}
-                      style={{
-                        color: option.previewText,
-                        background: option.previewBg,
-                        textShadow: option.previewShadow,
-                      }}
+                      style={themeVariables(option.colors)}
                       onClick={() => applyThemeSelection(option.value)}
                       onFocus={() => setFocusedThemeIndex(index)}
                       onMouseEnter={() => setFocusedThemeIndex(index)}
@@ -599,7 +689,7 @@ function App() {
               activeIndex={activeIndex}
               phraseRef={phraseRef}
             />
-            <textarea ref={textInputRef} id="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} rows={1} style={{ fontFamily: font }} aria-label="위 문장 따라 입력하기" disabled={!currentPhrase || Boolean(loadError)}
+            <textarea ref={textInputRef} id="textInput" value={text} spellCheck="false" autoComplete="off" autoCapitalize="off" autoFocus={true} rows={1} style={{ fontFamily: fontFamily }} aria-label="위 문장 따라 입력하기" disabled={!currentPhrase || Boolean(loadError)}
               onInput={(e) => {
                 const input = pendingSpaceRef.current
                   ? stripAdvanceSpace(currentPhrase, e.target.value)
@@ -688,6 +778,9 @@ function App() {
           </div>
         )}
       </div>
+
+      {settingsError && <p role="alert" className="settings-notice">{settingsError} <button type="button" onClick={() => setSettingsError('')}>닫기</button></p>}
+      {menuOpen && <CustomizationMenu settings={customization} onSave={saveCustomization} onDelete={deleteCustomization} onClose={closeMenu} pixel={isPixel} fontFamily={fontFamily} />}
 
       <div id="preloader">
         <span style={{ fontFamily: "GowunDodum" }}>고운돋움</span>

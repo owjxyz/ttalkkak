@@ -30,6 +30,8 @@
    문장 이동(`PgUp/PgDn`)과 선택자 조작 등 자주 쓰는 동작을 키보드로 편하게 다룰 수 있습니다. ⌨️
 6. 문장 로딩 상태
    문장 데이터를 불러오지 못하면 오류를 표시하고 입력을 막습니다.
+7. ESC 설정 메뉴
+   ESC 또는 날짜 클릭으로 메뉴를 엽니다. 날짜에 마우스를 올리면 Settings로 표시됩니다. 이름을 붙인 웹폰트와 색상 테마를 추가·편집·삭제하면 기존 선택 목록에도 나타납니다. 설정은 현재 브라우저의 `localStorage`에만 저장되며, 메뉴를 사용하는 시간은 CPM 계산에서 제외됩니다.
 
 ## 🎨 UI/UX 포인트
 
@@ -81,6 +83,11 @@ pnpm run deploy
 `deploy`는 새로 빌드한 뒤 `dist`를 GitHub Pages에 올립니다.
 
 검사: `pnpm test`, `pnpm lint`, `pnpm build`
+
+브라우저 회귀 검증: 개발 서버에서 `/ttalkkak/tests/font-menu.html`, `/ttalkkak/tests/customization.html`, `/ttalkkak/tests/themes.html`을 열면 PASS/FAIL을 표시합니다. 커스텀 글꼴은 외부 사용(CORS)이 허용된 HTTPS 폰트 파일 URL을 사용합니다.
+
+기본 테마 팔레트는 `src/themes.js`에서 관리합니다. 기본·자동·사용자 지정 테마는 같은 `--theme-*` CSS 변수를 사용하며, Theme Selector의 미리보기와 브라우저 상단 색상도 같은 팔레트를 따릅니다.
+사용자 지정 테마의 테두리와 글자 옆 `Shadow` 버튼으로 패널·글자 그림자를 각각 켜거나 끌 수 있으며, 테마마다 설정이 저장됩니다.
 
 ## 📁 프로젝트 구조
 

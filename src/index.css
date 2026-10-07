@@ -1,4 +1,11 @@
 body {
+  --theme-background: #343434;
+  --theme-panel: #343434;
+  --theme-input: #454545;
+  --theme-text: #f3f3f3;
+  --theme-border: #f3f3f3;
+  --theme-accent: #f3f3f3;
+  --theme-error: #ff3333;
   margin: 0;
   padding: 0;
   width: 100vw;
@@ -9,12 +16,12 @@ body {
   justify-content: center;
   align-items: center;
 
-  background-color: #343434;
-  color: #f3f3f3;
-  text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 1);
+  background-color: var(--theme-background);
+  color: var(--theme-text);
+  text-shadow: var(--theme-text-shadow, none);
   font-family: 'GowunDodum';
   overflow: hidden;
-  transition: background-color 0.5s, border-color 0.5s, text-color 0.5s;
+  transition: background-color 0.5s, border-color 0.5s, color 0.5s;
 }
 
 #root {

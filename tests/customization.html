@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#343434">
+    <title>ESC customization regression check</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <pre id="result" style="position:fixed;top:0;left:0;z-index:99999;white-space:pre-wrap"></pre>
+    <script type="module">
+      // Run npm run dev and open /ttalkkak/tests/customization.html.
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import '../src/index.css';
+      const keys = ['Font', 'Theme', 'Customization'];
+      const backup = keys.map(key => localStorage.getItem(key));
+      const setItem = Storage.prototype.setItem;
+      keys.forEach(key => localStorage.removeItem(key));
+      const { default: App } = await import('../src/App.jsx');
+      const root = createRoot(document.getElementById('root'));
+      const settle = async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); };
+      const assert = (ok, message) => { if (!ok) throw new Error(message); };
+      const waitFor = async (predicate) => {
+        for (let i = 0; i < 300; i++) {
+          if (predicate()) return;
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        throw new Error('Timed out waiting for UI');
+      };
+      const key = (target, value, extra = {}) => target.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true, ...extra }));
+      const click = async id => {
+        document.getElementById(id).click(); await settle();
+        if (id.startsWith('save-custom-') && !document.getElementById(id)) {
+          assert(document.querySelector('.saved-presets'), 'Save must return to the preset list');
+          key(document.activeElement, 'Escape'); await settle();
+        }
+      };
+      const openNew = async kind => {
+        await click(`edit-custom-${kind}`);
+        assert(document.querySelector('.saved-presets') && !document.getElementById(`custom-${kind}-name`), 'Preset list must be separate from the editor');
+        await click(`new-custom-${kind}`);
+        assert(!document.querySelector('.saved-presets'), 'Editor must not include the management list');
+      };
+      const input = async (id, value) => {
+        const element = document.getElementById(id);
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(element, value);
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        await settle();
+      };
+      try {
+        root.render(React.createElement(App));
+        await waitFor(() => document.getElementById('textInput')?.disabled === false);
+        assert(document.getElementById('date').tagName === 'BUTTON' && !document.getElementById('open-practice-menu'), 'Date must be the settings trigger without a separate menu button');
+        const typing = document.getElementById('textInput');
+        const typedPrefix = document.getElementById('currentPhrase').textContent.slice(0, 1);
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(typing, typedPrefix);
+        typing.dispatchEvent(new Event('input', { bubbles: true }));
+        typing.setSelectionRange(1, 1);
+        await settle();
+        key(typing, 'Escape', { isComposing: true });
+        await settle();
+        assert(!document.querySelector('dialog[open]'), 'IME Escape must not open the menu');
+        key(typing, 'Escape');
+        await settle();
+        assert(document.querySelector('dialog[open]'), 'Escape must open the overlay');
+        assert(document.activeElement.id === 'resume-practice', 'Menu must focus resume');
+        assert(document.querySelector('#github-repository').href === 'https://github.com/owjxyz/ttalkkak', 'Repository link must point to this project');
+        const score = document.getElementById('current').textContent;
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        assert(document.getElementById('current').textContent === score, 'CPM must stay paused in the menu');
+        await openNew('theme');
+        const themeDialog = document.getElementById('practice-menu');
+        const colorFields = document.querySelector('.custom-color-fields');
+        assert(getComputedStyle(colorFields).overflowY === 'auto', 'Only color fields must scroll in the theme editor');
+        assert(themeDialog.scrollHeight <= themeDialog.clientHeight + 1, 'Theme editor must fit without scrolling the whole menu');
+        assert(document.getElementById('custom-theme-name'), 'Theme editor must allow a preset name');
+        await input('custom-theme-name', 'Ocean');
+        await input('custom-background', '#123456');
+        assert(document.body.className === 'dark', 'Draft must not change the active theme');
+        key(document.activeElement, 'Escape');
+        await settle();
+        assert(document.querySelector('.saved-presets'), 'Escape from editor must return to its list');
+        key(document.activeElement, 'Escape'); await settle();
+        assert(document.getElementById('resume-practice'), 'Escape from list must return to the menu');
+        assert(!localStorage.getItem('Customization'), 'Cancelled draft must not be saved');
+        await openNew('theme');
+        assert(document.getElementById('custom-theme-name'), 'Theme editor must allow a preset name');
+        await input('custom-theme-name', 'Ocean');
+        await input('custom-background', '#123456');
+        await input('custom-text', '#abcdef');
+        await input('custom-panel', '#234567');
+        await input('custom-input', '#345678');
+        assert(getComputedStyle(document.querySelector('.custom-preview-panel')).backgroundColor === 'rgb(35, 69, 103)', 'Preview must show the panel background');
+        assert(getComputedStyle(document.querySelector('.custom-preview-input')).backgroundColor === 'rgb(52, 86, 120)', 'Preview must show a separate input background');
+        const shadowToggle = document.getElementById('toggle-theme-shadow');
+        assert(shadowToggle && shadowToggle.getAttribute('aria-pressed') === 'false', 'New custom themes must start without panel shadows');
+        await click('toggle-theme-shadow');
+        assert(shadowToggle.getAttribute('aria-pressed') === 'true' && getComputedStyle(document.querySelector('.custom-preview-panel')).boxShadow !== 'none', 'Shadow toggle must update the preview');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow === 'none', 'Panel shadows must not add text shadows');
+        await click('toggle-theme-text-shadow');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow !== 'none', 'Text shadow toggle must update the preview');
+        Storage.prototype.setItem = function(key, value) {
+          if (key === 'Customization') throw new DOMException('Storage full', 'QuotaExceededError');
+          return setItem.call(this, key, value);
+        };
+        await click('save-custom-theme');
+        assert(document.querySelector('dialog [role="alert"]') && !localStorage.getItem('Customization'), 'Failed save must retain the draft and show an error');
+        assert(document.body.className === 'dark' && localStorage.getItem('Theme') !== 'custom', 'Failed save must preserve the active preference');
+        Storage.prototype.setItem = setItem;
+        await click('save-custom-theme');
+        assert(JSON.parse(localStorage.getItem('Customization')).themes[0].background === '#123456', 'Saved colors must persist locally');
+        assert(document.body.className === 'custom', 'Save must apply the custom theme');
+        assert(JSON.parse(localStorage.getItem('Customization')).themes[0].shadow === true, 'Shadow preference must persist locally');
+        assert(JSON.parse(localStorage.getItem('Customization')).themes[0].textShadow === true, 'Text shadow preference must persist locally');
+        assert(getComputedStyle(document.getElementById('textInput')).textShadow !== 'none', 'Saved text shadows must apply to the typing input');
+        assert([...document.querySelectorAll('.box')].every(panel => getComputedStyle(panel).boxShadow !== 'none'), 'Saved shadows must apply to practice panels');
+        await waitFor(() => getComputedStyle(document.body).backgroundColor === 'rgb(18, 52, 86)');
+        assert([...document.querySelectorAll('.box')].every(panel => getComputedStyle(panel).backgroundColor === 'rgb(35, 69, 103)'), 'Panel background must apply to all practice panels');
+        await waitFor(() => getComputedStyle(document.getElementById('textInput')).backgroundColor === 'rgb(52, 86, 120)');
+        await openNew('theme');
+        await input('custom-theme-name', 'Forest');
+        await input('custom-background', '#234567');
+        await click('save-custom-theme');
+        assert(JSON.parse(localStorage.getItem('Customization')).themes.length === 2, 'Distinct theme names must create distinct presets');
+        await openNew('theme');
+        await input('custom-theme-name', 'Forest');
+        await input('custom-background', '#345678');
+        await click('save-custom-theme');
+        assert(JSON.parse(localStorage.getItem('Customization')).themes.length === 2, 'Saving the same name must update, not duplicate');
+        await openNew('font');
+        await input('custom-font-name', 'My font');
+        await input('custom-font-url', 'javascript:alert(1)');
+        await click('load-custom-font');
+        assert(document.querySelector('dialog [role="alert"]'), 'Unsafe URL must show an error');
+        assert(!localStorage.getItem('Font')?.startsWith('custom-font:'), 'Invalid font must not change selection');
+        await input('custom-font-url', 'https://cdn.jsdelivr.net/gh/owjxyz/ttalkkak@main/public/phrase.json');
+        await click('load-custom-font');
+        await waitFor(() => document.querySelector('dialog [role="alert"]'));
+        assert(!localStorage.getItem('Font')?.startsWith('custom-font:'), 'Font decode failure must preserve selection');
+        await input('custom-font-url', 'https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GowunDodum-Regular.woff');
+        await click('load-custom-font');
+        await waitFor(() => !document.getElementById('save-custom-font').disabled);
+        await click('save-custom-font');
+        assert(localStorage.getItem('Font').startsWith('custom-font:'), 'Valid webfont must be selected');
+        assert(JSON.parse(localStorage.getItem('Customization')).fonts[0].name === 'My font', 'Font metadata must persist locally');
+        await openNew('font');
+        await input('custom-font-name', 'Second font');
+        await input('custom-font-url', 'https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GowunDodum-Regular.woff');
+        await click('load-custom-font');
+        await waitFor(() => !document.getElementById('save-custom-font').disabled);
+        await click('save-custom-font');
+        assert(JSON.parse(localStorage.getItem('Customization')).fonts.length === 2, 'Distinct font names must create distinct presets');
+        await click('resume-practice');
+        assert(typing.value === typedPrefix && typing.selectionStart === 1, 'Resume must preserve input and caret');
+        assert(document.activeElement === typing, 'Resume must restore typing focus');
+        await click('fontSelector');
+        assert(document.getElementById('fontList').textContent.includes('My font') && document.getElementById('fontList').textContent.includes('Second font'), 'Custom font must appear beside built-in fonts');
+        key(document.activeElement, 'Escape');
+        await settle();
+        assert(!document.querySelector('dialog[open]'), 'Closing a selector must not open the overlay');
+        await click('themeSelector');
+        assert(document.getElementById('themeMenu').textContent.includes('Ocean') && document.getElementById('themeMenu').textContent.includes('Forest'), 'Named local themes must appear alongside built-ins');
+        const dark = document.querySelector('[data-theme="dark"]');
+        dark.click();
+        await settle();
+        assert(document.body.className === 'dark' && JSON.parse(localStorage.getItem('Customization')).themes, 'Built-in theme must preserve saved custom colors');
+        root.unmount();
+        const remount = createRoot(document.getElementById('root'));
+        remount.render(React.createElement(App));
+        await waitFor(() => document.getElementById('textInput')?.disabled === false);
+        await click('themeSelector');
+        assert([...document.querySelectorAll('[data-theme]')].find(item => item.textContent.includes('Ocean')), 'Local custom theme must survive remount');
+        [...document.querySelectorAll('[data-theme]')].find(item => item.textContent.includes('Ocean')).click();
+        await settle();
+        await waitFor(() => getComputedStyle(document.body).backgroundColor === 'rgb(18, 52, 86)');
+        await click('date');
+        await click('edit-custom-theme');
+        const editTheme = document.querySelector('[aria-label="Ocean 편집"]');
+        assert(editTheme, 'Saved presets must have editable list rows');
+        editTheme.click();
+        await settle();
+        assert(document.getElementById('toggle-theme-shadow').getAttribute('aria-pressed') === 'true', 'Editing after remount must restore the shadow preference');
+        assert(document.getElementById('toggle-theme-text-shadow').getAttribute('aria-pressed') === 'true', 'Editing after remount must restore text shadows');
+        await click('toggle-theme-shadow');
+        assert(getComputedStyle(document.querySelector('.custom-preview-panel')).boxShadow === 'none', 'Turning shadows off must update the preview');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow !== 'none', 'Panel toggle must preserve text shadows');
+        await click('toggle-theme-text-shadow');
+        assert(getComputedStyle(document.querySelector('.custom-theme-preview')).textShadow === 'none', 'Turning text shadows off must update the preview');
+        await input('custom-theme-name', 'Sea');
+        await click('save-custom-theme');
+        assert([...document.querySelectorAll('.box')].every(panel => getComputedStyle(panel).boxShadow === 'none'), 'Turning shadows off must remove saved panel shadows');
+        assert(getComputedStyle(document.getElementById('textInput')).textShadow === 'none', 'Turning text shadows off must remove saved text shadows');
+        assert(JSON.parse(localStorage.getItem('Customization')).themes.length === 2, 'Renaming an existing preset must not create a duplicate');
+        await click('edit-custom-theme');
+        document.querySelector('[aria-label="Sea 삭제"]').focus();
+        document.querySelector('[aria-label="Sea 삭제"]').click();
+        await settle();
+        assert(JSON.parse(localStorage.getItem('Customization')).themes.length === 2, 'Delete must wait for confirmation');
+        assert(document.activeElement.getAttribute('aria-label') === 'Sea 삭제 확인', 'Delete must focus its confirmation');
+        document.querySelector('[aria-label="Sea 삭제 확인"]').click();
+        await settle();
+        assert(JSON.parse(localStorage.getItem('Customization')).themes.length === 1, 'Confirmed delete must remove the stored theme');
+        assert(document.body.className === 'dark' && localStorage.getItem('Theme') === 'dark', 'Deleting the active theme must restore Dark');
+        key(document.activeElement, 'Escape');
+        await settle();
+        await click('edit-custom-font');
+        document.querySelector('[aria-label="Second font 삭제"]').click();
+        await settle();
+        Storage.prototype.setItem = function(key, value) {
+          if (key === 'Customization') throw new DOMException('Storage full', 'QuotaExceededError');
+          return setItem.call(this, key, value);
+        };
+        document.querySelector('[aria-label="Second font 삭제 확인"]').click();
+        await settle();
+        assert(JSON.parse(localStorage.getItem('Customization')).fonts.length === 2, 'Failed delete must preserve presets');
+        assert(localStorage.getItem('Font').startsWith('custom-font:'), `Failed delete must preserve the selection: ${localStorage.getItem('Font')}`);
+        Storage.prototype.setItem = setItem;
+        document.querySelector('[aria-label="Second font 삭제 확인"]').click();
+        await settle();
+        assert(JSON.parse(localStorage.getItem('Customization')).fonts.length === 1, 'Confirmed delete must remove the stored font');
+        assert(localStorage.getItem('Font') === 'GowunDodum', 'Deleting the active font must restore the default');
+        key(document.activeElement, 'Escape');
+        await settle();
+        await click('resume-practice');
+        await click('fontSelector');
+        assert(!document.getElementById('fontList').textContent.includes('Second font') && document.getElementById('fontList').textContent.includes('My font'), 'Only deleted fonts must disappear from the dropdown');
+        key(document.activeElement, 'Escape');
+        await settle();
+        await click('themeSelector');
+        assert(!document.getElementById('themeMenu').textContent.includes('Sea') && document.getElementById('themeMenu').textContent.includes('Forest'), 'Only deleted themes must disappear from the dropdown');
+        key(document.activeElement, 'Escape');
+        await settle();
+        const latest = JSON.parse(localStorage.getItem('Customization'));
+        latest.fonts.push({ ...latest.fonts[0], id: `custom-font:${crypto.randomUUID()}`, name: 'Other tab' });
+        localStorage.setItem('Customization', JSON.stringify(latest));
+        await click('date');
+        await click('edit-custom-font');
+        document.querySelector('[aria-label="My font 삭제"]').click();
+        await settle();
+        document.querySelector('[aria-label="My font 삭제 확인"]').click();
+        await settle();
+        assert(JSON.parse(localStorage.getItem('Customization')).fonts.some(item => item.name === 'Other tab'), 'Mutations must preserve newer presets from another tab');
+        document.getElementById('result').textContent = 'PASS: ESC, IME, pause, drafts, named local presets, list editing/deletion, storage failures, font loading, selectors and focus';
+      } catch (error) {
+        document.getElementById('result').textContent = `FAIL: ${error.message}`;
+        console.error(error);
+      } finally {
+        Storage.prototype.setItem = setItem;
+        keys.forEach((key, index) => backup[index] === null ? localStorage.removeItem(key) : localStorage.setItem(key, backup[index]));
+      }
+    </script>
+  </body>
+</html>
